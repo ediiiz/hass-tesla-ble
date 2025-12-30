@@ -16,7 +16,25 @@ update:
 
 generate:
 	@echo "Regenerating protobuf files..."
-	uv run python -m grpc_tools.protoc -I. --python_out=../custom_components/tesla_ble/core/proto/ --pyi_out=../custom_components/tesla_ble/core/proto/ *.proto
+	uv run python -m grpc_tools.protoc --proto_path=. --python_out=../custom_components/tesla_ble/core/proto/ --pyi_out=../custom_components/tesla_ble/core/proto/ *.proto google/protobuf/timestamp.proto
+	@echo "Fixing protobuf imports..."
+	@# For all .py files generated...
+	@# 1. Make local imports relative (e.g., `from . import vcsec_pb2`).
+	@# 2. Make the vendored `timestamp_pb2` import relative.
+	@# 3. Fix the ugly alias for `timestamp_pb2` and update its usages.
+	sed -i -E \
+		-e 's/^import ([a-zA-Z0-9_]+_pb2)/from . import \1/' \
+		-e 's/^(from google\.protobuf import timestamp_pb2)/from .google.protobuf import timestamp_pb2/' \
+		-e 's/ as google_dot_protobuf_dot_timestamp__pb2/ as _timestamp_pb2/' \
+		-e 's/google_dot_protobuf_dot_timestamp__pb2\./_timestamp_pb2\./g' \
+		../custom_components/tesla_ble/core/proto/*.py
+	@# For all .pyi files generated...
+	@# 1. Make local imports relative.
+	@# 2. Make the vendored `timestamp_pb2` import relative.
+	sed -i -E \
+		-e 's/^import ([a-zA-Z0-9_]+_pb2)/from . import \1/' \
+		-e 's/^(from google\.protobuf import timestamp_pb2)/from .google.protobuf import timestamp_pb2/' \
+		../custom_components/tesla_ble/core/proto/*.pyi
 	@echo "Protobuf files regenerated successfully!"
 
 help:
