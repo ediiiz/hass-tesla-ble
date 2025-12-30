@@ -4,7 +4,7 @@ import logging
 import struct
 from typing import TYPE_CHECKING, Any
 
-from .proto import (
+from .proto import ( # type: ignore
     car_server_pb2,
     universal_message_pb2,
     vcsec_pb2,
@@ -130,7 +130,7 @@ class TeslaProtocol:
         return self._wrap_vcsec_unsigned_message(unsigned_msg)
 
     def _wrap_vcsec_unsigned_message(
-        self, unsigned_msg: vcsec_pb2.UnsignedMessage
+        self, unsigned_msg: Any
     ) -> bytes:
         """Wrap a VCSEC message into a secure RoutableMessage and prepend length."""
         # Wrap UnsignedMessage into ToVCSECMessage
@@ -148,7 +148,7 @@ class TeslaProtocol:
 
         return self._encode_ble_message(routable_msg)
 
-    def _wrap_car_server_action(self, action: car_server_pb2.Action) -> bytes:
+    def _wrap_car_server_action(self, action: Any) -> bytes:
         """Wrap a CarServer action into a secure RoutableMessage and prepend length."""
         payload_bytes = action.SerializeToString()
 
@@ -160,7 +160,7 @@ class TeslaProtocol:
 
         return self._encode_ble_message(routable_msg)
 
-    def _encode_ble_message(self, msg: universal_message_pb2.RoutableMessage) -> bytes:
+    def _encode_ble_message(self, msg: Any) -> bytes:
         """Prepend 2-byte BE length header to serialized RoutableMessage."""
         data = msg.SerializeToString()
         length = len(data)

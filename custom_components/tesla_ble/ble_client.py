@@ -6,7 +6,7 @@ from typing import Any
 
 from bleak import BleakClient
 from bleak.exc import BleakError
-from homeassistant.components.bluetooth import async_ble_client_from_address
+from homeassistant.components.bluetooth import async_ble_device_from_address
 from homeassistant.core import HomeAssistant
 
 from .core.ble_interface import (
@@ -55,11 +55,12 @@ class TeslaHABLEClient(TeslaBLEInterface):
 
         try:
             # Get a BleakClient wrapper that works with HA's proxies
-            self._client = async_ble_client_from_address(self._hass, address)
-            if not self._client:
+            device = async_ble_device_from_address(self._hass, address, connectable=True)
+            if not device:
                 _LOGGER.error("Could not find device with address %s", address)
                 return False
 
+            self._client = BleakClient(device)
             await self._client.connect()
             _LOGGER.info("Successfully connected to Tesla vehicle at %s", address)
             return True
@@ -122,10 +123,10 @@ class TeslaHABLEClient(TeslaBLEInterface):
             _LOGGER.error("Cannot register notification: Not connected to vehicle")
             return
 
-        def _handle_notification(_: Any, data: bytes) -> None:
+        def _handle_notification(_: Any, data: bytearray) -> None:
             """Handle incoming notification data."""
             _LOGGER.debug("Received BLE notification: %s", data.hex())
-            callback(data)
+            callback(bytes(data))
 
         try:
             await self._client.start_notify(

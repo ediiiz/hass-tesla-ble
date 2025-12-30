@@ -12,9 +12,9 @@ from homeassistant.components.bluetooth import (
     BluetoothServiceInfoBleak,
     async_discovered_service_info,
 )
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 
 from .ble_client import TeslaHABLEClient
 from .const import (
@@ -45,7 +45,7 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the initial step."""
         if user_input is not None:
             self._address = user_input["device"]
@@ -82,7 +82,7 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_pair(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the pairing step."""
 
         if user_input is not None:
@@ -93,6 +93,7 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Actually, the instructions say "Wait for a successful response or
             # timeout." We'll do the actual pairing logic in a background task
             # or right here.
+            assert self._session_manager is not None
             return self.async_create_entry(
                 title=f"Tesla {self._vin or self._address}",
                 data={
@@ -109,6 +110,9 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if not self._client:
             self._client = TeslaHABLEClient(self.hass)
+
+        if self._address is None:
+            return self.async_abort(reason="missing_address")
 
         if not await self._client.connect(self._address):
             return self.async_show_form(

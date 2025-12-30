@@ -27,13 +27,13 @@ PLATFORMS: list[Platform] = [
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Tesla BLE from a config entry."""
     address = entry.data[CONF_ADDRESS]
-    public_key = bytes.fromhex(entry.data[CONF_PUBLIC_KEY])
+    # public_key is not used here but kept for reference or future use if needed
+    # public_key = bytes.fromhex(entry.data[CONF_PUBLIC_KEY])
     private_key = bytes.fromhex(entry.data[CONF_PRIVATE_KEY])
 
     # Initialize core components
     session_manager = TeslaSessionManager(
         private_key_bytes=private_key,
-        public_key_bytes=public_key,
     )
     client = TeslaHABLEClient(hass)
 

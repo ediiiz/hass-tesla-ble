@@ -4,7 +4,7 @@ import logging
 import secrets
 import time
 from enum import IntEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,7 +20,7 @@ from .crypto import (
     get_public_key_bytes,
     load_private_key,
 )
-from .proto import keys_pb2, signatures_pb2, universal_message_pb2, vcsec_pb2
+from .proto import keys_pb2, signatures_pb2, universal_message_pb2, vcsec_pb2 # type: ignore
 
 if TYPE_CHECKING:
     pass
@@ -121,7 +121,7 @@ class TeslaSessionManager:
 
     def prepare_session_info_request(
         self, domain: int
-    ) -> universal_message_pb2.RoutableMessage:
+    ) -> Any:
         """Prepare a SessionInfoRequest message.
 
         Args:
@@ -144,7 +144,7 @@ class TeslaSessionManager:
         return msg
 
     def update_session(
-        self, domain: int, session_info: signatures_pb2.SessionInfo
+        self, domain: int, session_info: Any
     ) -> None:
         """Update session state from a SessionInfo message.
 
@@ -178,6 +178,11 @@ class TeslaSessionManager:
         )
 
         # Salt: epoch + local_key_id + vehicle_key_id
+        if session.epoch is None:
+            _LOGGER.error("Epoch is None during session update")
+            self.invalidate_session(domain)
+            return
+
         salt = session.epoch + self._key_id + session.vehicle_key_id
         _LOGGER.debug("Handshake salt: %s", salt.hex())
 
@@ -213,7 +218,7 @@ class TeslaSessionManager:
         self,
         domain: int,
         payload_bytes: bytes,
-    ) -> universal_message_pb2.RoutableMessage:
+    ) -> Any:
         """Wrap a payload in an authenticated RoutableMessage.
 
         Args:
@@ -251,6 +256,7 @@ class TeslaSessionManager:
         _LOGGER.debug(
             "Wrapping message for domain %s, counter %d", domain, session.counter
         )
+        assert session.session_keys is not None
         ciphertext_with_tag = aes_gcm_encrypt(
             key=session.session_keys.encryption_key,
             nonce=nonce,
@@ -267,7 +273,7 @@ class TeslaSessionManager:
 
         return msg
 
-    def _prepare_aad(self, domain: int, counter: int, epoch: bytes) -> bytes:
+    def _prepare_aad(self, domain: int, counter: int, epoch: bytes | None) -> bytes:
         """Prepare Associated Authenticated Data for encryption/decryption.
 
         AAD = TagDomain + Domain + TagCounter + Counter + TagEpoch + Epoch
@@ -284,12 +290,17 @@ class TeslaSessionManager:
 
         # TagEpoch (0x03) + Epoch (16 bytes)
         aad.append(signatures_pb2.TAG_EPOCH)
-        aad.extend(epoch)
+        if epoch is not None:
+            aad.extend(epoch)
+        else:
+            # Handle None epoch by appending 16 zero bytes or empty?
+            # Tesla protocol expects 16 bytes for epoch.
+            aad.extend(b"\x00" * 16)
 
         return bytes(aad)
 
     def unwrap_message(
-        self, domain: int, msg: universal_message_pb2.RoutableMessage
+        self, domain: int, msg: Any
     ) -> bytes:
         """Decrypt and verify an incoming RoutableMessage.
 
@@ -312,17 +323,17 @@ class TeslaSessionManager:
                     universal_message_pb2.MESSAGEFAULT_ERROR_INCORRECT_EPOCH,
                 ):
                     self.invalidate_session(domain)
-                return msg.protobuf_message_as_bytes
+                return msg.protobuf_message_as_bytes # type: ignore
 
         if not session.is_authenticated():
             # If not authenticated, return raw bytes (e.g. for status messages)
-            return msg.protobuf_message_as_bytes
+            return msg.protobuf_message_as_bytes # type: ignore
 
         if msg.signature_data.WhichOneof("sig_type") != "AES_GCM_Response_data":
             _LOGGER.debug(
                 "Message from %s does not have AES_GCM_Response_data signature", domain
             )
-            return msg.protobuf_message_as_bytes
+            return msg.protobuf_message_as_bytes # type: ignore
 
         resp_data = msg.signature_data.AES_GCM_Response_data
 
@@ -347,6 +358,7 @@ class TeslaSessionManager:
                 domain,
                 resp_data.counter,
             )
+            assert session.session_keys is not None
             plaintext = aes_gcm_decrypt(
                 key=session.session_keys.encryption_key,
                 nonce=nonce,
@@ -360,7 +372,7 @@ class TeslaSessionManager:
 
     def prepare_pairing_message(
         self, role: int = keys_pb2.ROLE_DRIVER
-    ) -> universal_message_pb2.RoutableMessage:
+    ) -> Any:
         """Prepare a whitelist message for pairing.
 
         Args:

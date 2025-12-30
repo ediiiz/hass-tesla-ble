@@ -57,7 +57,7 @@ def get_private_key_bytes(private_key: ec.EllipticCurvePrivateKey) -> bytes:
     Returns:
         The 32-byte private key.
     """
-    return private_key.private_numbers().private_value.to_bytes(PRIVATE_KEY_SIZE, "big")
+    return private_key.private_numbers().private_value.to_bytes(PRIVATE_KEY_SIZE, "big") # type: ignore
 
 
 def get_public_key_bytes(private_key: ec.EllipticCurvePrivateKey) -> bytes:
@@ -112,7 +112,7 @@ def compute_shared_secret(
     _LOGGER.debug(
         "Computing shared secret with peer public key: %s", peer_public_key_bytes.hex()
     )
-    peer_public_key = ec.EllipticCurvePublicNumbers.from_encoded_point(
+    peer_public_key = ec.EllipticCurvePublicNumbers.from_encoded_point( # type: ignore
         CURVE, peer_public_key_bytes
     ).public_key()
     shared_secret = private_key.exchange(ec.ECDH(), peer_public_key)
