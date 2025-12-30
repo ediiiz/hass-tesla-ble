@@ -76,7 +76,9 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
             is_tesla = False
             # Check by Service UUID
-            if TESLA_SERVICE_UUID in info.service_uuids:
+            # TESLA_SERVICE_UUID is the official one (0211)
+            # but some proxies/adapters report 1122
+            if TESLA_SERVICE_UUID in info.service_uuids or "00001122-0000-1000-8000-00805f9b34fb" in info.service_uuids:
                 is_tesla = True
             # Check by Name pattern (S<16hex>C)
             elif info.name and info.name.startswith("S") and info.name.endswith("C") and len(info.name) == 18:
@@ -138,41 +140,55 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         # Start pairing process
-        if not self._session_manager:
-            self._session_manager = TeslaSessionManager()
+        _LOGGER.debug("Starting pairing process for %s", self._address)
+        try:
+            if not self._session_manager:
+                self._session_manager = TeslaSessionManager()
 
-        if not self._client:
-            self._client = TeslaHABLEClient(self.hass)
+            if not self._client:
+                self._client = TeslaHABLEClient(self.hass)
+        except Exception as e:
+            _LOGGER.exception("Failed to initialize session manager or client: %s", e)
+            raise
 
         if self._address is None:
             return self.async_abort(reason="missing_address")
 
         if not await self._client.connect(self._address):
+            _LOGGER.error("Failed to connect to %s", self._address)
             return self.async_show_form(
                 step_id="user",
                 errors={"base": "cannot_connect"},
             )
 
-        # Generate pairing message
-        pairing_msg = self._session_manager.prepare_pairing_message()
+        try:
+            # Generate pairing message
+            _LOGGER.debug("Preparing pairing message")
+            pairing_msg = self._session_manager.prepare_pairing_message()
 
-        # We need to wrap it with length header
-        # (TeslaBLEInterface/TeslaHABLEClient expect raw bytes for characteristic)
-        # Actually, TeslaBLEInterface.write_characteristic takes bytes.
-        # We should use TeslaProtocol._encode_ble_message but it's internal.
-        # Let's just do it here or use the protocol if we had it.
-        # Wait, TeslaSessionManager doesn't do the length encoding.
+            # We need to wrap it with length header
+            # (TeslaBLEInterface/TeslaHABLEClient expect raw bytes for characteristic)
+            # Actually, TeslaBLEInterface.write_characteristic takes bytes.
+            # We should use TeslaProtocol._encode_ble_message but it's internal.
+            # Let's just do it here or use the protocol if we had it.
+            # Wait, TeslaSessionManager doesn't do the length encoding.
 
-        data = pairing_msg.SerializeToString()
-        import struct
+            data = pairing_msg.SerializeToString()
+            import struct
 
-        length = len(data)
-        encoded_msg = struct.pack(">H", length) + data
+            length = len(data)
+            encoded_msg = struct.pack(">H", length) + data
+            _LOGGER.debug("Pairing message prepared (length=%d): %s", length, encoded_msg.hex())
 
-        # Set up a listener for the response
-        self._pairing_task = asyncio.create_task(self._wait_for_pairing())
+            # Set up a listener for the response
+            self._pairing_task = asyncio.create_task(self._wait_for_pairing())
 
-        await self._client.write_characteristic(encoded_msg)
+            _LOGGER.debug("Writing to characteristic")
+            await self._client.write_characteristic(encoded_msg)
+            _LOGGER.debug("Write successful")
+        except Exception as e:
+            _LOGGER.exception("Error during pairing message generation or write: %s", e)
+            raise
 
         # Most Teslas require user interaction.
         # We show the form and wait for user to click "Next".
