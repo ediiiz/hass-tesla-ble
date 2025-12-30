@@ -49,10 +49,14 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the initial step."""
         if user_input is not None:
             self._address = user_input["device"]
-            # Extract name/VIN from discovery info if possible
-            # Tesla devices often have names like "Tesla Model 3" or similar
-            # But the VIN is often in the scan response or advertisement data
-            # For now, we'll just use the address and try to get VIN later
+            
+            # Try to extract VIN from the name if we cached it, or just use the device name
+            name = self._discovered_devices.get(self._address)
+            if name and name.startswith("S") and name.endswith("C") and len(name) == 18:
+                # Name is effectively the partial VIN hash, but we don't have the full VIN yet
+                # We will update the config entry title later once we have the full VIN
+                pass
+
             await self.async_set_unique_id(self._address)
             self._abort_if_already_configured()
             return await self.async_step_pair()
@@ -61,9 +65,37 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         discovered = async_discovered_service_info(self.hass)
         self._discovered_devices = {}
         for info in discovered:
+            _LOGGER.debug(
+                "Discovered device: %s (%s), UUIDs: %s, Manufacturer Data: %s",
+                info.name,
+                info.address,
+                info.service_uuids,
+                info.manufacturer_data,
+            )
+            
+            is_tesla = False
+            # Check by Service UUID
             if TESLA_SERVICE_UUID in info.service_uuids:
+                is_tesla = True
+            # Check by Name pattern (S<16hex>C)
+            elif info.name and info.name.startswith("S") and info.name.endswith("C") and len(info.name) == 18:
+                 # Check if the middle part is hex
+                try:
+                    int(info.name[1:-1], 16)
+                    is_tesla = True
+                except ValueError:
+                    pass
+
+            if is_tesla:
                 name = info.name or info.address
                 self._discovered_devices[info.address] = name
+            else:
+                _LOGGER.debug(
+                    "Device %s skipped: Not identified as Tesla (UUID: %s, Name: %s)",
+                    info.address,
+                    info.service_uuids,
+                    info.name
+                )
 
         if not self._discovered_devices:
             return self.async_show_form(

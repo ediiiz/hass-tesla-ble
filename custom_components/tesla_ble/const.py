@@ -9,4 +9,4 @@ CONF_PUBLIC_KEY: Final = "public_key"
 CONF_PRIVATE_KEY: Final = "private_key"
 
 # Tesla BLE Service UUID
-TESLA_SERVICE_UUID: Final = "00000211-0000-1000-8000-00805f9b34fb"
+TESLA_SERVICE_UUID: Final = "00000211-b2d1-43f0-9b88-960cebf8b91e"
