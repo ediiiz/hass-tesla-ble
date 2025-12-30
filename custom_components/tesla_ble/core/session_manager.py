@@ -61,12 +61,17 @@ class TeslaSession(BaseModel):
 class TeslaSessionManager:
     """Manages authentication sessions with a Tesla vehicle."""
 
-    def __init__(self, private_key_bytes: bytes | None = None) -> None:
+    def __init__(
+        self,
+        private_key_bytes: bytes | None = None,
+        vin: str | None = None,
+    ) -> None:
         """Initialize the session manager.
 
         Args:
             private_key_bytes: The local 32-byte private key.
             If None, a new one will be generated.
+            vin: The vehicle identification number.
         """
         if private_key_bytes:
             self._private_key = load_private_key(private_key_bytes)
@@ -75,6 +80,8 @@ class TeslaSessionManager:
 
         self._public_key_bytes = get_public_key_bytes(self._private_key)
         self._key_id = derive_key_id(self._public_key_bytes)
+        self._vin = vin
+        self._vehicle_clock_offset: float = 0.0
 
         self._sessions: dict[int, TeslaSession] = {
             universal_message_pb2.DOMAIN_VEHICLE_SECURITY: TeslaSession(
@@ -84,6 +91,10 @@ class TeslaSessionManager:
                 domain=universal_message_pb2.DOMAIN_INFOTAINMENT
             ),
         }
+
+    def set_vin(self, vin: str) -> None:
+        """Set the vehicle VIN."""
+        self._vin = vin
 
     @property
     def private_key_bytes(self) -> bytes:
@@ -171,6 +182,10 @@ class TeslaSessionManager:
         session.vehicle_public_key = session_info.publicKey
         session.vehicle_key_id = derive_key_id(session_info.publicKey)
 
+        # Update clock offset: vehicle_time = local_time - offset
+        # session_info.clock_time is vehicle's uptime or similar
+        self._vehicle_clock_offset = time.time() - session_info.clock_time
+
         # Derive session keys
         _LOGGER.debug("Deriving session keys for domain %s", domain)
         shared_secret = compute_shared_secret(
@@ -242,19 +257,26 @@ class TeslaSessionManager:
         # Prepare signature data
         msg.signature_data.signer_identity.public_key = self._public_key_bytes
 
+        # Calculate expiration (now + 5s relative to vehicle clock zero)
+        expires_at = int(time.time() - self._vehicle_clock_offset) + 5
+
         personalized = msg.signature_data.AES_GCM_Personalized_data
         personalized.epoch = session.epoch
         personalized.counter = session.counter
-        personalized.expires_at = 0
+        personalized.expires_at = expires_at
 
         nonce = secrets.token_bytes(12)
         personalized.nonce = nonce
 
         # Prepare AAD
-        aad = self._prepare_aad(domain, session.counter, session.epoch)
+        sig_type = signatures_pb2.SIGNATURE_TYPE_AES_GCM_PERSONALIZED
+        aad = self._prepare_aad(domain, session.counter, session.epoch, sig_type, expires_at)
 
         _LOGGER.debug(
-            "Wrapping message for domain %s, counter %d", domain, session.counter
+            "Wrapping message for domain %s, counter %d, expires_at %d",
+            domain,
+            session.counter,
+            expires_at,
         )
         assert session.session_keys is not None
         ciphertext_with_tag = aes_gcm_encrypt(
@@ -273,29 +295,66 @@ class TeslaSessionManager:
 
         return msg
 
-    def _prepare_aad(self, domain: int, counter: int, epoch: bytes | None) -> bytes:
+    def _prepare_aad(
+        self,
+        domain: int,
+        counter: int,
+        epoch: bytes | None,
+        sig_type: int,
+        expires_at: int,
+    ) -> bytes:
         """Prepare Associated Authenticated Data for encryption/decryption.
 
-        AAD = TagDomain + Domain + TagCounter + Counter + TagEpoch + Epoch
+        AAD uses a TLV (Tag-Length-Value) format for metadata hashing.
         """
+        _LOGGER.debug(
+            "Preparing AAD: domain=%s, counter=%d, vin=%s, sig_type=%d, expires_at=%d",
+            domain,
+            counter,
+            self._vin,
+            sig_type,
+            expires_at,
+        )
         aad = bytearray()
 
-        # TagDomain (0x01) + Domain (4 bytes BE)
+        # TagSignatureType (0x00) + Length (0x01) + Value (1 byte)
+        aad.append(signatures_pb2.TAG_SIGNATURE_TYPE)
+        aad.append(1)
+        aad.append(sig_type)
+
+        # TagDomain (0x01) + Length (0x01) + Value (1 byte)
+        # Note: Reference uses 1 byte for domain in AAD
         aad.append(signatures_pb2.TAG_DOMAIN)
-        aad.extend(domain.to_bytes(4, "big"))
+        aad.append(1)
+        aad.append(domain)
 
-        # TagCounter (0x05) + Counter (4 bytes BE)
-        aad.append(signatures_pb2.TAG_COUNTER)
-        aad.extend(counter.to_bytes(4, "big"))
+        # TagPersonalization (0x02) + Length + Value (VIN)
+        if self._vin:
+            vin_bytes = self._vin.encode("utf-8")
+            aad.append(signatures_pb2.TAG_PERSONALIZATION)
+            aad.append(len(vin_bytes))
+            aad.extend(vin_bytes)
 
-        # TagEpoch (0x03) + Epoch (16 bytes)
+        # TagEpoch (0x03) + Length (0x10) + Value (16 bytes)
         aad.append(signatures_pb2.TAG_EPOCH)
+        aad.append(16)
         if epoch is not None:
             aad.extend(epoch)
         else:
-            # Handle None epoch by appending 16 zero bytes or empty?
-            # Tesla protocol expects 16 bytes for epoch.
             aad.extend(b"\x00" * 16)
+
+        # TagExpiresAt (0x04) + Length (0x04) + Value (4 bytes BE)
+        aad.append(signatures_pb2.TAG_EXPIRES_AT)
+        aad.append(4)
+        aad.extend(expires_at.to_bytes(4, "big"))
+
+        # TagCounter (0x05) + Length (0x04) + Value (4 bytes BE)
+        aad.append(signatures_pb2.TAG_COUNTER)
+        aad.append(4)
+        aad.extend(counter.to_bytes(4, "big"))
+
+        # TagEnd (0xFF)
+        aad.append(signatures_pb2.TAG_END)
 
         return bytes(aad)
 
@@ -379,34 +438,26 @@ class TeslaSessionManager:
             role: The role to request (default: ROLE_DRIVER).
 
         Returns:
-            The prepared RoutableMessage containing the VCSEC whitelist operation.
+            The prepared ToVCSECMessage containing the VCSEC whitelist operation.
         """
-        # 1. Create WhitelistOperation
+        # 1. Create PermissionChange (to specify role)
+        perm_change = vcsec_pb2.PermissionChange()
+        perm_change.key.PublicKeyRaw = self._public_key_bytes
+        perm_change.keyRole = role
+
+        # 2. Create WhitelistOperation
         wl_op = vcsec_pb2.WhitelistOperation()
-        # Role is already an int from keys_pb2.Role
-        wl_op.addPublicKeyToWhitelist.PublicKeyRaw = self._public_key_bytes
-
-        # Metdata for role
+        wl_op.addKeyToWhitelistAndAddPermissions.CopyFrom(perm_change)
         wl_op.metadataForKey.keyFormFactor = vcsec_pb2.KEY_FORM_FACTOR_CLOUD_KEY
-        wl_op.metadataForKey.keyRole = role
 
-        # Wait, the role needs to be set.
-        # Looking at vcsec.proto, addPublicKeyToWhitelist is just PublicKey.
-        # PermissionChange might be needed for role.
-        # Reference implementation often uses PermissionChange for role.
-
-        # Simplified: Many vehicles just accept the key and user confirms on screen.
-
-        # 2. Wrap in UnsignedMessage
+        # 3. Wrap in UnsignedMessage
         unsigned_msg = vcsec_pb2.UnsignedMessage()
         unsigned_msg.WhitelistOperation.CopyFrom(wl_op)
 
-        payload = unsigned_msg.SerializeToString()
+        # 4. Wrap in ToVCSECMessage with PRESENT_KEY signature
+        # This is the standard pairing message that vehicles expect when whitelisting a new key.
+        to_vcsec = vcsec_pb2.ToVCSECMessage()
+        to_vcsec.signedMessage.protobufMessageAsBytes = unsigned_msg.SerializeToString()
+        to_vcsec.signedMessage.signatureType = vcsec_pb2.SIGNATURE_TYPE_PRESENT_KEY
 
-        # 3. Wrap in RoutableMessage (Broadcast domain, unauthenticated)
-        msg = universal_message_pb2.RoutableMessage()
-        msg.to_destination.domain = universal_message_pb2.DOMAIN_VEHICLE_SECURITY
-        msg.from_destination.domain = universal_message_pb2.DOMAIN_BROADCAST
-        msg.protobuf_message_as_bytes = payload
-
-        return msg
+        return to_vcsec

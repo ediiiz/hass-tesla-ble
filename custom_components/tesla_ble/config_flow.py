@@ -59,7 +59,7 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             await self.async_set_unique_id(self._address)
             self._abort_if_already_configured()
-            return await self.async_step_pair()
+            return await self.async_step_vin()
 
         # Scan for Tesla devices
         discovered = async_discovered_service_info(self.hass)
@@ -115,6 +115,29 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
         )
 
+    async def async_step_vin(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the VIN entry step."""
+        errors = {}
+        if user_input is not None:
+            vin = user_input[CONF_VIN].strip().upper()
+            if len(vin) != 17:
+                errors[CONF_VIN] = "invalid_vin"
+            else:
+                self._vin = vin
+                return await self.async_step_pair()
+
+        return self.async_show_form(
+            step_id="vin",
+            data_schema=schemas.Schema(
+                {
+                    schemas.Required(CONF_VIN): str,
+                }
+            ),
+            errors=errors,
+        )
+
     async def async_step_pair(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -143,7 +166,7 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         _LOGGER.debug("Starting pairing process for %s", self._address)
         try:
             if not self._session_manager:
-                self._session_manager = TeslaSessionManager()
+                self._session_manager = TeslaSessionManager(vin=self._vin)
 
             if not self._client:
                 self._client = TeslaHABLEClient(self.hass)
@@ -163,16 +186,11 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         try:
             # Generate pairing message
-            _LOGGER.debug("Preparing pairing message")
+            _LOGGER.debug("Preparing pairing message for address: %s", self._address)
+            _LOGGER.debug("Current VIN in flow: %s", self._vin)
             pairing_msg = self._session_manager.prepare_pairing_message()
 
-            # We need to wrap it with length header
-            # (TeslaBLEInterface/TeslaHABLEClient expect raw bytes for characteristic)
-            # Actually, TeslaBLEInterface.write_characteristic takes bytes.
-            # We should use TeslaProtocol._encode_ble_message but it's internal.
-            # Let's just do it here or use the protocol if we had it.
-            # Wait, TeslaSessionManager doesn't do the length encoding.
-
+            # Encode and prepend 2-byte BE length
             data = pairing_msg.SerializeToString()
             import struct
 
