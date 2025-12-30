@@ -1,0 +1,4049 @@
+Directory structure:
+└── pedroktfc-esphome-tesla-ble/
+    ├── README.md
+    ├── ble-scanner.yml
+    ├── Dockerfile
+    ├── googleb15a2640933085a1.html
+    ├── LICENSE
+    ├── Makefile
+    ├── requirements.txt
+    ├── secrets.yaml.example
+    ├── tesla-ble.example.yml
+    ├── .dockerignore
+    ├── boards/
+    │   ├── m5stack-atoms3.yml
+    │   └── m5stack-nanoc6.yml
+    ├── components/
+    │   ├── tesla_ble_listener/
+    │   │   ├── __init__.py
+    │   │   ├── tesla_ble_listener.cpp
+    │   │   └── tesla_ble_listener.h
+    │   └── tesla_ble_vehicle/
+    │       ├── __init__.py
+    │       ├── log.cpp
+    │       ├── log.h
+    │       └── tesla_ble_vehicle.h
+    ├── packages/
+    │   ├── base.yml
+    │   ├── board.yml
+    │   ├── client.yml
+    │   ├── common.yml
+    │   ├── external_components.dashboard.yml
+    │   ├── external_components.yml
+    │   ├── language_de.yml
+    │   ├── language_hu.yml
+    │   ├── listener.yml
+    │   └── project.yml
+    ├── static/
+    │   ├── _config.yml
+    │   └── index.md
+    └── .github/
+        ├── dependabot.yml
+        ├── FUNDING.yml
+        └── workflows/
+            └── ci.yml
+
+================================================
+FILE: README.md
+================================================
+# ESPHome Tesla BLE
+
+[![GitHub Release][releases-shield]][releases]
+[![GitHub Activity][commits-shield]][commits]
+[![Last Commit][last-commit-shield]][commits]
+[![Platform][platform-shield]](https://github.com/esphome)
+
+This project [PedroKTFC/esphome-tesla-ble](https://github.com/PedroKTFC/esphome-tesla-ble) lets you use an ESP32 device to manage charging a Tesla vehicle over BLE. It is a fork of the [yoziru/esphome-tesla-ble](http://github.com/yoziru/esphome-tesla-ble) and uses a similar fork of the [yoziru/tesla-ble](http://github.com/yoziru/tesla-ble) library.
+
+| Controls | Sensors-1 | Sensors-2| Diagnostic |
+| - | - | - | - |
+| <img src="./docs/ha-controls.png"> | <img src="./docs/ha-sensors1.png"> | <img src="./docs/ha-sensors2.png"> | <img src="./docs/ha-diagnostic.png"> |
+
+## If it doesn't build
+
+I've put this section at the start because it seems people don't always read all the way to the end! So please read this section at least.
+> [!TIP]
+> **Always** start from the example yaml [`tesla-ble-example.yml`](./tesla-ble.example.yml). This has been tested many times and should work in almost every case.
+
+If the build fails, try the following (assuming you're building using the Home Assistant ESPHome builder):
+- In the ESPHome builder UI, clean the build files (as shown in the image below) and try installing again. If that doesn't work, try the next step.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img width="35%" alt="image" src="https://github.com/user-attachments/assets/17b8a954-9af1-4c0b-9f64-bc0f5405f93c" />
+
+- Again in the ESPHome builder UI, click on the CLEAN ALL option and try installing again (as shown in the image below). If that still doesn't work, try the next step.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img width="40%" alt="Untitled" src="https://github.com/user-attachments/assets/43ede5f6-4e42-4124-ae22-9024a29b1754" />
+
+- Uninstall and install the ESPHome add-on and try installing again.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img width="25%" alt="image" src="https://github.com/user-attachments/assets/9700c133-4f2c-494a-8a42-4d4ab1d83942" />
+
+> [!TIP]
+> If these don't work, raise an issue and include a copy of your yaml and that part of your log that shows the error and I'll try to work out what's going wrong. (If you don't provide these, I'm afraid I'll simply ask you for them in the issue, I can't help without any information.)
+
+## Features
+
+### Controls
+
+These are implemented as switches, covers, buttons or numbers. Where indicated, these use the current sensor value for the control (but be aware that changing a value/state has a delay before it is reflected in the corresponding sensor - it takes time to send the messages to the vehicle to make the control and then read back the new value - it might look like the control has been rejected as the value reverts to the previous value; be patient!).
+
+- Open/close boot (cover)
+- Open/close charge port flap. Uses current sensor value (cover)
+- Turn on/off charger (switch)
+- Set charging amps (number)
+- Set charging limit (%).  Uses current sensor value (number)
+- Turn on/off climate. Uses current sensor value (switch)
+- Turn on/off defrost. Uses current sensor value (switch)
+- Flash lights (button)
+- Open frunk. Open only (cover)
+- Lock/unlock the car (lock)
+- Turn on/off sentry mode
+- Sound horn (button)
+- Turn on/off steering wheel heater (switch)
+- Unlatch driver door (button). This is disabled by default as it cannot be undone (eg if you're on holiday and, say your car is on your drive, if you accidentally action this button your driver door will unlatch and you can only re-close it physically!) 
+- Unlock charge port (button)
+- Vent/close windows (cover)
+- Wake up vehicle (button)
+
+### Vehicle Information Sensors
+
+There are two categories, those available even when asleep and those only when awake.
+
+- Always available:
+  - Asleep/awake
+  - Doors locked/unlocked
+  - User present/not present
+- Only when awake:
+  - Boot state open/closed
+  - Charge current (Amps)
+  - Charge distance added (miles)
+  - Charge energy added (kWh)
+  - Charging flap open/closed
+  - Charge level (%)
+  - Charge limit (%)
+  - Charge power (kW)
+  - Charge voltage (V)
+  - Charging state (eg Stopped, Charging, Complete)
+  - Climate on/off
+  - Current limit setting (Amps)
+  - Defrost state on/off
+  - Doors locked/unlocked
+  - Exterior temperature (°C)
+  - Frunk open/closed
+  - Interior temperature (°C)
+  - Last update (the last time a response was received from the Infotainment system, does not go "Unknown" once a response has been received)
+  - Minutes to limit (time to charge limit, multiples of 5 minutes)
+  - Odometer (miles)
+  - Range (miles)
+  - Shift state (eg Invalid, R, N, D)
+  - Windows open/closed
+
+### Diagnostics
+
+These are the diagnostic button actions:
+
+- Force data update (wakes the car and reads all sensors)
+- Pair BLE key with vehicle
+- Regenerate key - will require repairing
+- Restart ESP board
+
+### Configuration
+
+There are five number and two switch actions that allow the dynamic update of the polling parameters (see below). These are disabled by default as I recommend they should be changed through yaml but they are useful for tuning/debugging your setup. If enabled, their setting takes priority over the yaml definition and they are preserved over a reboot. Note there is no equivalent to the `update_interval` parameter - this can still only be updated through yaml (and so a re-build). The following lists them with the equivalent polling parameter:
+
+- Post wake poll time = post_wake_poll_time (number)
+- Poll data period = poll_data_period (number)
+- Poll asleep period = poll_asleep_period (number)
+- Poll charging period = poll_charging_period (number)
+- BLE disconnected min time = ble_disconnected_min_time (number)
+- Fast poll if unlocked = fast_poll_if_unlocked (switch)
+- Wake on boot = wake_on_boot (switch)
+
+## Hardware
+
+- ESP32
+- [M5Stack Atom S3](https://docs.m5stack.com/en/core/AtomS3)
+- Alternatively, [M5Stack Atom S3-Lite](https://docs.m5stack.com/en/core/AtomS3%20Lite)
+- Alternatively, [M5Stack Nano C6](https://docs.m5stack.com/en/core/M5NanoC6)
+- USB-C cable to flash conveniently the M5Stack of your choice
+- [ESP32 C3 Super Mini](https://www.espboards.dev/esp32/esp32-c3-super-mini/)
+
+See below for build instructions for different board types.
+
+## Usage
+
+### Vehicle data polling
+
+There are several parameters that determine the polling activity which are described in the table below. The polling engine loops every `update_interval` seconds and, as a minimum, polls the car's VCSEC system. All other polls are based on this so that if any of the other parameters are not multiples of `update_interval`, the timings will be longer than expected. For example, if `update_interval` is set to 30s and `poll_data_period` is set to 75s, then the effective `poll_data_period` will be 90s.
+
+| Name | Type | Default | Supported options | Description |
+| --- | --- | --- | --- | --- |
+|`update_interval`|number|10s|any interval|This is the base polling rate in seconds. **No other polls can happen faster than this even if you configure them shorter.** The base polling checks the overall status using the car’s VCSEC system (Vehicle Controller and Safety Electronics Controller, the central electronic control unit of a Tesla vehicle). It is polled at this rate and does not wake the car when asleep or prevent the car from going to sleep.|
+|`post_wake_poll_time`|number|300|>0 seconds|If the vehicle wakes up, it will be detected and the vehicle will be polled for data at a rate specified in `poll_data_period` for at least this number of seconds. After this, polling will fallback to a rate specified in `poll_asleep_period`. E.g. Suppose `post_wake_poll_time`=300, `poll_data_period`=60 and `poll_asleep_period`=120. In this case, when the care awakes, initially data will be polled each 60s for the first 300s. Then polling will continue each 120s.|
+|`poll_data_period`|number|60|>0 seconds|The vehicle is polled every this parameter seconds after becoming awake for a period of `post_wake_poll_time` seconds. Note the vehicle can stay awake if this is set too short.|
+|`poll_asleep_period`|number|60|>0 seconds|The vehicle is polled every this parameter seconds while being asleep and beyond the `post_wake_poll_time` after awakening. If set too short it can prevent the vehicle falling asleep.|
+|`poll_charging_period`|number|10|>0 seconds|While charging, the car can be polled more frequently if desired using this parameter.|
+|`ble_disconnected_min_time`|number|300|>0 seconds|Sensors will only be set to *Unknown* if the BLE connection remains disconnected for at least this time (useful if you have a slightly flakey BLE connection to your vehicle). Setting it to zero means sensors will be set to *Unknown* as soon as the BLE connection disconnects.|
+|`fast_poll_if_unlocked`|number|0|0, >0|Controls whether fast polls are enabled when unlocked. If the vehicle is unlocked (and `fast_poll_if_unlocked` > 0), it will be polled at `update_interval` until it is locked. This could be useful if you wish to quickly detect a change in the vehicle (for example, I use it to detect when it is put into gear so I can trigger an automation to open my electric gate). Set to 0 to disable, any value > 0 to enable.|
+|`wake_on_boot`|number|0|0, >0|Controls whether the car is woken when the board restarts. Set to 0 to not wake, any value > 0 to wake.|
+
+Note that while a user is present in the car (recall this is a VCSEC status so is polled for even when the car is asleep), polling will occur at `update_interval` and all sensors updated.
+
+## Miles vs Km
+
+By default the car reports miles, so this integration returns miles. In home assistant you can edit the sensor and select the preferred unit of measurement there.
+
+## Pre-requisites
+
+**Recommended path**
+- Home Assistant [Add-On Esphome Device Builder](https://esphome.io/guides/getting_started_hassio#installing-esphome-device-builder)
+
+**Alternative**
+- Python 3.10+
+- GNU Make
+
+## Finding the BLE MAC address of your vehicle
+
+**Recommended path**
+
+Use an appropriate BLE app on your phone (eg BLE Scanner) to scan for the BLE devices nearby (so be close to your car). You should see your car in the list of devices (its name will begin with an 'S') with the MAC address displayed.
+Copy and rename `secrets.yaml.example` to `secrets.yaml` and update it with your WiFi credentials (`wifi_ssid` and `wifi_password`) and vehicle VIN (`tesla_vin`) and BLE MAC adress (`ble_mac_address`).
+
+**Note the car's VIN is displayed in the windscreen, the Tesla app and (probably) your registration documents. In my case it begins with "LRW...". It is not the BLE beacon name you get when determining the BLE MAC address.**
+
+**Alternative**
+
+Build the scanner in the [`ble-scanner.yml`](./ble-scanner.yml) file. Once built, it will start scanning and print out the MAC address of any Tesla vehicles found in the logs. Building does take some time.
+
+The following is the original method. I have never tried this and I do not maintain the associated file. I therefore do not recommend this but have left it here in case there are any people left who still use it.
+
+1. Copy and rename `secrets.yaml.example` to `secrets.yaml` and update it with your WiFi credentials (`wifi_ssid` and `wifi_password`) and vehicle VIN (`tesla_vin`).
+1. Enable the `tesla_ble_listener` package in `packages/base.yml` by uncommenting the `listener: !include listener.yml` line.
+1. Build and flash the firmware to your ESP32 device. See the 'Building and flashing ESP32 firmware' section below.
+1. Open the ESPHome logs in Home Assistant and wake it up. Watch for the "Found Tesla vehicle" message, which will contain the BLE MAC address of your vehicle.
+    > Note: The vehicle must be in range and awake for the BLE MAC address to be discovered. If the vehicle is not awake, open the Tesla app and run any command
+    ```log
+    [00:00:00][D][tesla_ble_listener:044]: Parsing device: [CC:BB:D1:E2:34:F0]: BLE Device name 1
+    [00:00:00][D][tesla_ble_listener:044]: Parsing device: [19:8A:BB:C3:D2:1F]: 
+    [00:00:00][D][tesla_ble_listener:044]: Parsing device: [19:8A:BB:C3:D2:1F]:
+    [00:00:00][D][tesla_ble_listener:044]: Parsing device: [F5:4E:3D:C2:1B:A0]: BLE Device name 2
+    [00:00:00][D][tesla_ble_listener:044]: Parsing device: [A0:B1:C2:D3:E4:F5]: S1a87a5a75f3df858C
+    [00:00:00][I][tesla_ble_listener:054]: Found Tesla vehicle | Name: S1a87a5a75f3df858C | MAC: A0:B1:C2:D3:E4:F5
+    ```
+1. Clean up your environment before the next step by disabling the `tesla_ble_listener` package in `packages/base.yml` and running
+    ```sh
+    make clean
+    ```
+## Building and flashing ESP32 firmware
+
+### Recommended path
+
+For an example ESPHome dashboard, see [`tesla-ble-example.yml`](./tesla-ble.example.yml). Please always start from this. I strongly recommend building this using the ESPHome Device Builder add-on in Home Assistant as this makes building and re-building (eg for updates) much easier.
+
+### Board types
+
+Various board types have been shown to work with this project. Always start from [`tesla-ble-example.yml`](./tesla-ble.example.yml). Some boards require additional/changed yaml, please refer to the [`wiki`](https://github.com/PedroKTFC/esphome-tesla-ble/wiki/How-to-build-for-different-board-types).
+
+The [`tesla-ble-example.yml`](./tesla-ble.example.yml) file is setup to be used with a standard ESP32 device.
+
+### Alternative build method using make
+
+The following are instructions if you use `make`. I have never used these so cannot vouch for their accuracy (as I said above, it's far easier to use the ESPHome Device Builder add-on in Home Assistant). I welcome any feedback on improving/correcting these instructions - please raise an issue for it.
+
+1. Connect your ESP32 device to your computer via USB
+1. Copy and rename `secrets.yaml.example` to `secrets.yaml` and update it with your WiFi credentials (`wifi_ssid` and `wifi_password`) and vehicle details (`ble_mac_address` and `tesla_vin`)
+1. Build the image with [ESPHome](https://esphome.io/guides/getting_started_command_line.html). Alternate boards are listed in the `boards/` directory.
+
+    ```sh
+    make compile BOARD=m5stack-nanoc6
+    ```
+
+1. Upload/flash the firmware to the board.
+
+    ```sh
+    make upload BOARD=m5stack-nanoc6
+    ```
+
+1. After flashing, you can use the log command to monitor the logs from the device. The host suffix is the last part of the device name in the ESPHome dashboard (e.g. `5b2ac7`).
+
+    ```sh
+    make logs HOST_SUFFIX=-5b2ac7
+    ```
+
+1. For updating your device, you can OTA update over local WiFi using the same host suffix:
+
+    ```sh
+    make upload HOST_SUFFIX=-5b2ac7
+    ```
+
+> Note: the make commands are just a wrapper around the `esphome` command. You can also use the `esphome` commands directly if you prefer (e.g. `esphome compile tesla-ble-m5stack-nanoc6.yml`)
+
+## Adding the device to Home Assistant
+
+1. In Home Assistant, go to Settings > Devices & Services. If your device is discovered automatically, you can add it by clicking the "Configure" button by the discovered device. If not, click the "+ Add integration" button and select "ESPHome" as the integration and enter the IP address of your device.
+2. Enter the API encryption key from the `secrets.yaml` file when prompted.
+3. That's it! You should now see the device in Home Assistant and be able to control it.
+
+## Pairing the BLE key with your vehicle
+
+1. Make sure your ESP32 device is close to the car (check the "BLE Signal" sensor) and the BLE MAC address and VIN in `secrets.yaml` is correct. IT IS ESSENTIAL THESE ARE CORRECT - YOUR CAR WILL NOT PAIR OTHERWISE.
+1. Get into your vehicle
+1. In Home Assistant, go to Settings > Devices & Services > ESPHome, choose your Tesla BLE device and click "Pair BLE key"
+1. Tap your NFC card to your car's center console
+1. A prompt will appear on the screen of your car asking if you want to pair the key
+    > Note: if the popup does not appear, you may need to press "Pair BLE key" and tap your card again
+
+    <img src="./docs/vehicle-pair-request.png" width="500">
+
+1. Hit confirm on the screen
+1. To verify the key was added, tap Controls > Locks, and you should see a new key named "Unknown device" in the list
+1. [optional] Rename your key to "ESPHome BLE" to make it easier to identify
+
+    <img src="./docs/vehicle-locks.png" width="500">
+
+[commits-shield]: https://img.shields.io/github/commit-activity/y/PedroKTFC/esphome-tesla-ble
+[commits]: https://github.com/PedroKTFC/esphome-tesla-ble/commits/main
+[releases-shield]: https://img.shields.io/github/v/release/PedroKTFC/esphome-tesla-ble
+[releases]: https://github.com/Blackymas/PedroKTFC/esphome-tesla-ble
+[last-commit-shield]: https://img.shields.io/github/last-commit/PedroKTFC/esphome-tesla-ble
+[platform-shield]: https://img.shields.io/badge/platform-Home%20Assistant%20&%20ESPHome-blue
+
+
+
+
+
+
+
+
+
+
+
+================================================
+FILE: ble-scanner.yml
+================================================
+esphome:
+  name: ble-scanner
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+    
+
+logger:
+  level: DEBUG
+
+ota:
+  - platform: esphome
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+esp32_ble_tracker:
+  on_ble_advertise:
+    then:
+      - lambda: |-
+          std::string name = x.get_name();
+          bool is_tesla_format = false;
+
+          if (name.rfind("Tesla ", 0) == 0 && name.length() == 12) {
+            is_tesla_format = true;
+            for (int i = 6; i < 12; ++i) {
+              if (!isdigit(name[i])) {
+                is_tesla_format = false;
+                break;
+              }
+            }
+          }
+
+          if (is_tesla_format ||
+              (!name.empty() && name.front() == 'S' && name.back() == 'C') && name.length() == 18) {
+            ESP_LOGI("ble_adv", "Tesla found: MAC=%s Name=%s",
+              x.address_str().c_str(), name.c_str());
+          }
+
+
+
+================================================
+FILE: Dockerfile
+================================================
+FROM esphome/esphome
+
+COPY . /app
+# Compile
+RUN esphome compile
+
+
+
+================================================
+FILE: googleb15a2640933085a1.html
+================================================
+google-site-verification: googleb15a2640933085a1.html
+
+
+================================================
+FILE: LICENSE
+================================================
+                    GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
+
+ Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+                            Preamble
+
+  The GNU Affero General Public License is a free, copyleft license for
+software and other kinds of works, specifically designed to ensure
+cooperation with the community in the case of network server software.
+
+  The licenses for most software and other practical works are designed
+to take away your freedom to share and change the works.  By contrast,
+our General Public Licenses are intended to guarantee your freedom to
+share and change all versions of a program--to make sure it remains free
+software for all its users.
+
+  When we speak of free software, we are referring to freedom, not
+price.  Our General Public Licenses are designed to make sure that you
+have the freedom to distribute copies of free software (and charge for
+them if you wish), that you receive source code or can get it if you
+want it, that you can change the software or use pieces of it in new
+free programs, and that you know you can do these things.
+
+  Developers that use our General Public Licenses protect your rights
+with two steps: (1) assert copyright on the software, and (2) offer
+you this License which gives you legal permission to copy, distribute
+and/or modify the software.
+
+  A secondary benefit of defending all users' freedom is that
+improvements made in alternate versions of the program, if they
+receive widespread use, become available for other developers to
+incorporate.  Many developers of free software are heartened and
+encouraged by the resulting cooperation.  However, in the case of
+software used on network servers, this result may fail to come about.
+The GNU General Public License permits making a modified version and
+letting the public access it on a server without ever releasing its
+source code to the public.
+
+  The GNU Affero General Public License is designed specifically to
+ensure that, in such cases, the modified source code becomes available
+to the community.  It requires the operator of a network server to
+provide the source code of the modified version running there to the
+users of that server.  Therefore, public use of a modified version, on
+a publicly accessible server, gives the public access to the source
+code of the modified version.
+
+  An older license, called the Affero General Public License and
+published by Affero, was designed to accomplish similar goals.  This is
+a different license, not a version of the Affero GPL, but Affero has
+released a new version of the Affero GPL which permits relicensing under
+this license.
+
+  The precise terms and conditions for copying, distribution and
+modification follow.
+
+                       TERMS AND CONDITIONS
+
+  0. Definitions.
+
+  "This License" refers to version 3 of the GNU Affero General Public License.
+
+  "Copyright" also means copyright-like laws that apply to other kinds of
+works, such as semiconductor masks.
+
+  "The Program" refers to any copyrightable work licensed under this
+License.  Each licensee is addressed as "you".  "Licensees" and
+"recipients" may be individuals or organizations.
+
+  To "modify" a work means to copy from or adapt all or part of the work
+in a fashion requiring copyright permission, other than the making of an
+exact copy.  The resulting work is called a "modified version" of the
+earlier work or a work "based on" the earlier work.
+
+  A "covered work" means either the unmodified Program or a work based
+on the Program.
+
+  To "propagate" a work means to do anything with it that, without
+permission, would make you directly or secondarily liable for
+infringement under applicable copyright law, except executing it on a
+computer or modifying a private copy.  Propagation includes copying,
+distribution (with or without modification), making available to the
+public, and in some countries other activities as well.
+
+  To "convey" a work means any kind of propagation that enables other
+parties to make or receive copies.  Mere interaction with a user through
+a computer network, with no transfer of a copy, is not conveying.
+
+  An interactive user interface displays "Appropriate Legal Notices"
+to the extent that it includes a convenient and prominently visible
+feature that (1) displays an appropriate copyright notice, and (2)
+tells the user that there is no warranty for the work (except to the
+extent that warranties are provided), that licensees may convey the
+work under this License, and how to view a copy of this License.  If
+the interface presents a list of user commands or options, such as a
+menu, a prominent item in the list meets this criterion.
+
+  1. Source Code.
+
+  The "source code" for a work means the preferred form of the work
+for making modifications to it.  "Object code" means any non-source
+form of a work.
+
+  A "Standard Interface" means an interface that either is an official
+standard defined by a recognized standards body, or, in the case of
+interfaces specified for a particular programming language, one that
+is widely used among developers working in that language.
+
+  The "System Libraries" of an executable work include anything, other
+than the work as a whole, that (a) is included in the normal form of
+packaging a Major Component, but which is not part of that Major
+Component, and (b) serves only to enable use of the work with that
+Major Component, or to implement a Standard Interface for which an
+implementation is available to the public in source code form.  A
+"Major Component", in this context, means a major essential component
+(kernel, window system, and so on) of the specific operating system
+(if any) on which the executable work runs, or a compiler used to
+produce the work, or an object code interpreter used to run it.
+
+  The "Corresponding Source" for a work in object code form means all
+the source code needed to generate, install, and (for an executable
+work) run the object code and to modify the work, including scripts to
+control those activities.  However, it does not include the work's
+System Libraries, or general-purpose tools or generally available free
+programs which are used unmodified in performing those activities but
+which are not part of the work.  For example, Corresponding Source
+includes interface definition files associated with source files for
+the work, and the source code for shared libraries and dynamically
+linked subprograms that the work is specifically designed to require,
+such as by intimate data communication or control flow between those
+subprograms and other parts of the work.
+
+  The Corresponding Source need not include anything that users
+can regenerate automatically from other parts of the Corresponding
+Source.
+
+  The Corresponding Source for a work in source code form is that
+same work.
+
+  2. Basic Permissions.
+
+  All rights granted under this License are granted for the term of
+copyright on the Program, and are irrevocable provided the stated
+conditions are met.  This License explicitly affirms your unlimited
+permission to run the unmodified Program.  The output from running a
+covered work is covered by this License only if the output, given its
+content, constitutes a covered work.  This License acknowledges your
+rights of fair use or other equivalent, as provided by copyright law.
+
+  You may make, run and propagate covered works that you do not
+convey, without conditions so long as your license otherwise remains
+in force.  You may convey covered works to others for the sole purpose
+of having them make modifications exclusively for you, or provide you
+with facilities for running those works, provided that you comply with
+the terms of this License in conveying all material for which you do
+not control copyright.  Those thus making or running the covered works
+for you must do so exclusively on your behalf, under your direction
+and control, on terms that prohibit them from making any copies of
+your copyrighted material outside their relationship with you.
+
+  Conveying under any other circumstances is permitted solely under
+the conditions stated below.  Sublicensing is not allowed; section 10
+makes it unnecessary.
+
+  3. Protecting Users' Legal Rights From Anti-Circumvention Law.
+
+  No covered work shall be deemed part of an effective technological
+measure under any applicable law fulfilling obligations under article
+11 of the WIPO copyright treaty adopted on 20 December 1996, or
+similar laws prohibiting or restricting circumvention of such
+measures.
+
+  When you convey a covered work, you waive any legal power to forbid
+circumvention of technological measures to the extent such circumvention
+is effected by exercising rights under this License with respect to
+the covered work, and you disclaim any intention to limit operation or
+modification of the work as a means of enforcing, against the work's
+users, your or third parties' legal rights to forbid circumvention of
+technological measures.
+
+  4. Conveying Verbatim Copies.
+
+  You may convey verbatim copies of the Program's source code as you
+receive it, in any medium, provided that you conspicuously and
+appropriately publish on each copy an appropriate copyright notice;
+keep intact all notices stating that this License and any
+non-permissive terms added in accord with section 7 apply to the code;
+keep intact all notices of the absence of any warranty; and give all
+recipients a copy of this License along with the Program.
+
+  You may charge any price or no price for each copy that you convey,
+and you may offer support or warranty protection for a fee.
+
+  5. Conveying Modified Source Versions.
+
+  You may convey a work based on the Program, or the modifications to
+produce it from the Program, in the form of source code under the
+terms of section 4, provided that you also meet all of these conditions:
+
+    a) The work must carry prominent notices stating that you modified
+    it, and giving a relevant date.
+
+    b) The work must carry prominent notices stating that it is
+    released under this License and any conditions added under section
+    7.  This requirement modifies the requirement in section 4 to
+    "keep intact all notices".
+
+    c) You must license the entire work, as a whole, under this
+    License to anyone who comes into possession of a copy.  This
+    License will therefore apply, along with any applicable section 7
+    additional terms, to the whole of the work, and all its parts,
+    regardless of how they are packaged.  This License gives no
+    permission to license the work in any other way, but it does not
+    invalidate such permission if you have separately received it.
+
+    d) If the work has interactive user interfaces, each must display
+    Appropriate Legal Notices; however, if the Program has interactive
+    interfaces that do not display Appropriate Legal Notices, your
+    work need not make them do so.
+
+  A compilation of a covered work with other separate and independent
+works, which are not by their nature extensions of the covered work,
+and which are not combined with it such as to form a larger program,
+in or on a volume of a storage or distribution medium, is called an
+"aggregate" if the compilation and its resulting copyright are not
+used to limit the access or legal rights of the compilation's users
+beyond what the individual works permit.  Inclusion of a covered work
+in an aggregate does not cause this License to apply to the other
+parts of the aggregate.
+
+  6. Conveying Non-Source Forms.
+
+  You may convey a covered work in object code form under the terms
+of sections 4 and 5, provided that you also convey the
+machine-readable Corresponding Source under the terms of this License,
+in one of these ways:
+
+    a) Convey the object code in, or embodied in, a physical product
+    (including a physical distribution medium), accompanied by the
+    Corresponding Source fixed on a durable physical medium
+    customarily used for software interchange.
+
+    b) Convey the object code in, or embodied in, a physical product
+    (including a physical distribution medium), accompanied by a
+    written offer, valid for at least three years and valid for as
+    long as you offer spare parts or customer support for that product
+    model, to give anyone who possesses the object code either (1) a
+    copy of the Corresponding Source for all the software in the
+    product that is covered by this License, on a durable physical
+    medium customarily used for software interchange, for a price no
+    more than your reasonable cost of physically performing this
+    conveying of source, or (2) access to copy the
+    Corresponding Source from a network server at no charge.
+
+    c) Convey individual copies of the object code with a copy of the
+    written offer to provide the Corresponding Source.  This
+    alternative is allowed only occasionally and noncommercially, and
+    only if you received the object code with such an offer, in accord
+    with subsection 6b.
+
+    d) Convey the object code by offering access from a designated
+    place (gratis or for a charge), and offer equivalent access to the
+    Corresponding Source in the same way through the same place at no
+    further charge.  You need not require recipients to copy the
+    Corresponding Source along with the object code.  If the place to
+    copy the object code is a network server, the Corresponding Source
+    may be on a different server (operated by you or a third party)
+    that supports equivalent copying facilities, provided you maintain
+    clear directions next to the object code saying where to find the
+    Corresponding Source.  Regardless of what server hosts the
+    Corresponding Source, you remain obligated to ensure that it is
+    available for as long as needed to satisfy these requirements.
+
+    e) Convey the object code using peer-to-peer transmission, provided
+    you inform other peers where the object code and Corresponding
+    Source of the work are being offered to the general public at no
+    charge under subsection 6d.
+
+  A separable portion of the object code, whose source code is excluded
+from the Corresponding Source as a System Library, need not be
+included in conveying the object code work.
+
+  A "User Product" is either (1) a "consumer product", which means any
+tangible personal property which is normally used for personal, family,
+or household purposes, or (2) anything designed or sold for incorporation
+into a dwelling.  In determining whether a product is a consumer product,
+doubtful cases shall be resolved in favor of coverage.  For a particular
+product received by a particular user, "normally used" refers to a
+typical or common use of that class of product, regardless of the status
+of the particular user or of the way in which the particular user
+actually uses, or expects or is expected to use, the product.  A product
+is a consumer product regardless of whether the product has substantial
+commercial, industrial or non-consumer uses, unless such uses represent
+the only significant mode of use of the product.
+
+  "Installation Information" for a User Product means any methods,
+procedures, authorization keys, or other information required to install
+and execute modified versions of a covered work in that User Product from
+a modified version of its Corresponding Source.  The information must
+suffice to ensure that the continued functioning of the modified object
+code is in no case prevented or interfered with solely because
+modification has been made.
+
+  If you convey an object code work under this section in, or with, or
+specifically for use in, a User Product, and the conveying occurs as
+part of a transaction in which the right of possession and use of the
+User Product is transferred to the recipient in perpetuity or for a
+fixed term (regardless of how the transaction is characterized), the
+Corresponding Source conveyed under this section must be accompanied
+by the Installation Information.  But this requirement does not apply
+if neither you nor any third party retains the ability to install
+modified object code on the User Product (for example, the work has
+been installed in ROM).
+
+  The requirement to provide Installation Information does not include a
+requirement to continue to provide support service, warranty, or updates
+for a work that has been modified or installed by the recipient, or for
+the User Product in which it has been modified or installed.  Access to a
+network may be denied when the modification itself materially and
+adversely affects the operation of the network or violates the rules and
+protocols for communication across the network.
+
+  Corresponding Source conveyed, and Installation Information provided,
+in accord with this section must be in a format that is publicly
+documented (and with an implementation available to the public in
+source code form), and must require no special password or key for
+unpacking, reading or copying.
+
+  7. Additional Terms.
+
+  "Additional permissions" are terms that supplement the terms of this
+License by making exceptions from one or more of its conditions.
+Additional permissions that are applicable to the entire Program shall
+be treated as though they were included in this License, to the extent
+that they are valid under applicable law.  If additional permissions
+apply only to part of the Program, that part may be used separately
+under those permissions, but the entire Program remains governed by
+this License without regard to the additional permissions.
+
+  When you convey a copy of a covered work, you may at your option
+remove any additional permissions from that copy, or from any part of
+it.  (Additional permissions may be written to require their own
+removal in certain cases when you modify the work.)  You may place
+additional permissions on material, added by you to a covered work,
+for which you have or can give appropriate copyright permission.
+
+  Notwithstanding any other provision of this License, for material you
+add to a covered work, you may (if authorized by the copyright holders of
+that material) supplement the terms of this License with terms:
+
+    a) Disclaiming warranty or limiting liability differently from the
+    terms of sections 15 and 16 of this License; or
+
+    b) Requiring preservation of specified reasonable legal notices or
+    author attributions in that material or in the Appropriate Legal
+    Notices displayed by works containing it; or
+
+    c) Prohibiting misrepresentation of the origin of that material, or
+    requiring that modified versions of such material be marked in
+    reasonable ways as different from the original version; or
+
+    d) Limiting the use for publicity purposes of names of licensors or
+    authors of the material; or
+
+    e) Declining to grant rights under trademark law for use of some
+    trade names, trademarks, or service marks; or
+
+    f) Requiring indemnification of licensors and authors of that
+    material by anyone who conveys the material (or modified versions of
+    it) with contractual assumptions of liability to the recipient, for
+    any liability that these contractual assumptions directly impose on
+    those licensors and authors.
+
+  All other non-permissive additional terms are considered "further
+restrictions" within the meaning of section 10.  If the Program as you
+received it, or any part of it, contains a notice stating that it is
+governed by this License along with a term that is a further
+restriction, you may remove that term.  If a license document contains
+a further restriction but permits relicensing or conveying under this
+License, you may add to a covered work material governed by the terms
+of that license document, provided that the further restriction does
+not survive such relicensing or conveying.
+
+  If you add terms to a covered work in accord with this section, you
+must place, in the relevant source files, a statement of the
+additional terms that apply to those files, or a notice indicating
+where to find the applicable terms.
+
+  Additional terms, permissive or non-permissive, may be stated in the
+form of a separately written license, or stated as exceptions;
+the above requirements apply either way.
+
+  8. Termination.
+
+  You may not propagate or modify a covered work except as expressly
+provided under this License.  Any attempt otherwise to propagate or
+modify it is void, and will automatically terminate your rights under
+this License (including any patent licenses granted under the third
+paragraph of section 11).
+
+  However, if you cease all violation of this License, then your
+license from a particular copyright holder is reinstated (a)
+provisionally, unless and until the copyright holder explicitly and
+finally terminates your license, and (b) permanently, if the copyright
+holder fails to notify you of the violation by some reasonable means
+prior to 60 days after the cessation.
+
+  Moreover, your license from a particular copyright holder is
+reinstated permanently if the copyright holder notifies you of the
+violation by some reasonable means, this is the first time you have
+received notice of violation of this License (for any work) from that
+copyright holder, and you cure the violation prior to 30 days after
+your receipt of the notice.
+
+  Termination of your rights under this section does not terminate the
+licenses of parties who have received copies or rights from you under
+this License.  If your rights have been terminated and not permanently
+reinstated, you do not qualify to receive new licenses for the same
+material under section 10.
+
+  9. Acceptance Not Required for Having Copies.
+
+  You are not required to accept this License in order to receive or
+run a copy of the Program.  Ancillary propagation of a covered work
+occurring solely as a consequence of using peer-to-peer transmission
+to receive a copy likewise does not require acceptance.  However,
+nothing other than this License grants you permission to propagate or
+modify any covered work.  These actions infringe copyright if you do
+not accept this License.  Therefore, by modifying or propagating a
+covered work, you indicate your acceptance of this License to do so.
+
+  10. Automatic Licensing of Downstream Recipients.
+
+  Each time you convey a covered work, the recipient automatically
+receives a license from the original licensors, to run, modify and
+propagate that work, subject to this License.  You are not responsible
+for enforcing compliance by third parties with this License.
+
+  An "entity transaction" is a transaction transferring control of an
+organization, or substantially all assets of one, or subdividing an
+organization, or merging organizations.  If propagation of a covered
+work results from an entity transaction, each party to that
+transaction who receives a copy of the work also receives whatever
+licenses to the work the party's predecessor in interest had or could
+give under the previous paragraph, plus a right to possession of the
+Corresponding Source of the work from the predecessor in interest, if
+the predecessor has it or can get it with reasonable efforts.
+
+  You may not impose any further restrictions on the exercise of the
+rights granted or affirmed under this License.  For example, you may
+not impose a license fee, royalty, or other charge for exercise of
+rights granted under this License, and you may not initiate litigation
+(including a cross-claim or counterclaim in a lawsuit) alleging that
+any patent claim is infringed by making, using, selling, offering for
+sale, or importing the Program or any portion of it.
+
+  11. Patents.
+
+  A "contributor" is a copyright holder who authorizes use under this
+License of the Program or a work on which the Program is based.  The
+work thus licensed is called the contributor's "contributor version".
+
+  A contributor's "essential patent claims" are all patent claims
+owned or controlled by the contributor, whether already acquired or
+hereafter acquired, that would be infringed by some manner, permitted
+by this License, of making, using, or selling its contributor version,
+but do not include claims that would be infringed only as a
+consequence of further modification of the contributor version.  For
+purposes of this definition, "control" includes the right to grant
+patent sublicenses in a manner consistent with the requirements of
+this License.
+
+  Each contributor grants you a non-exclusive, worldwide, royalty-free
+patent license under the contributor's essential patent claims, to
+make, use, sell, offer for sale, import and otherwise run, modify and
+propagate the contents of its contributor version.
+
+  In the following three paragraphs, a "patent license" is any express
+agreement or commitment, however denominated, not to enforce a patent
+(such as an express permission to practice a patent or covenant not to
+sue for patent infringement).  To "grant" such a patent license to a
+party means to make such an agreement or commitment not to enforce a
+patent against the party.
+
+  If you convey a covered work, knowingly relying on a patent license,
+and the Corresponding Source of the work is not available for anyone
+to copy, free of charge and under the terms of this License, through a
+publicly available network server or other readily accessible means,
+then you must either (1) cause the Corresponding Source to be so
+available, or (2) arrange to deprive yourself of the benefit of the
+patent license for this particular work, or (3) arrange, in a manner
+consistent with the requirements of this License, to extend the patent
+license to downstream recipients.  "Knowingly relying" means you have
+actual knowledge that, but for the patent license, your conveying the
+covered work in a country, or your recipient's use of the covered work
+in a country, would infringe one or more identifiable patents in that
+country that you have reason to believe are valid.
+
+  If, pursuant to or in connection with a single transaction or
+arrangement, you convey, or propagate by procuring conveyance of, a
+covered work, and grant a patent license to some of the parties
+receiving the covered work authorizing them to use, propagate, modify
+or convey a specific copy of the covered work, then the patent license
+you grant is automatically extended to all recipients of the covered
+work and works based on it.
+
+  A patent license is "discriminatory" if it does not include within
+the scope of its coverage, prohibits the exercise of, or is
+conditioned on the non-exercise of one or more of the rights that are
+specifically granted under this License.  You may not convey a covered
+work if you are a party to an arrangement with a third party that is
+in the business of distributing software, under which you make payment
+to the third party based on the extent of your activity of conveying
+the work, and under which the third party grants, to any of the
+parties who would receive the covered work from you, a discriminatory
+patent license (a) in connection with copies of the covered work
+conveyed by you (or copies made from those copies), or (b) primarily
+for and in connection with specific products or compilations that
+contain the covered work, unless you entered into that arrangement,
+or that patent license was granted, prior to 28 March 2007.
+
+  Nothing in this License shall be construed as excluding or limiting
+any implied license or other defenses to infringement that may
+otherwise be available to you under applicable patent law.
+
+  12. No Surrender of Others' Freedom.
+
+  If conditions are imposed on you (whether by court order, agreement or
+otherwise) that contradict the conditions of this License, they do not
+excuse you from the conditions of this License.  If you cannot convey a
+covered work so as to satisfy simultaneously your obligations under this
+License and any other pertinent obligations, then as a consequence you may
+not convey it at all.  For example, if you agree to terms that obligate you
+to collect a royalty for further conveying from those to whom you convey
+the Program, the only way you could satisfy both those terms and this
+License would be to refrain entirely from conveying the Program.
+
+  13. Remote Network Interaction; Use with the GNU General Public License.
+
+  Notwithstanding any other provision of this License, if you modify the
+Program, your modified version must prominently offer all users
+interacting with it remotely through a computer network (if your version
+supports such interaction) an opportunity to receive the Corresponding
+Source of your version by providing access to the Corresponding Source
+from a network server at no charge, through some standard or customary
+means of facilitating copying of software.  This Corresponding Source
+shall include the Corresponding Source for any work covered by version 3
+of the GNU General Public License that is incorporated pursuant to the
+following paragraph.
+
+  Notwithstanding any other provision of this License, you have
+permission to link or combine any covered work with a work licensed
+under version 3 of the GNU General Public License into a single
+combined work, and to convey the resulting work.  The terms of this
+License will continue to apply to the part which is the covered work,
+but the work with which it is combined will remain governed by version
+3 of the GNU General Public License.
+
+  14. Revised Versions of this License.
+
+  The Free Software Foundation may publish revised and/or new versions of
+the GNU Affero General Public License from time to time.  Such new versions
+will be similar in spirit to the present version, but may differ in detail to
+address new problems or concerns.
+
+  Each version is given a distinguishing version number.  If the
+Program specifies that a certain numbered version of the GNU Affero General
+Public License "or any later version" applies to it, you have the
+option of following the terms and conditions either of that numbered
+version or of any later version published by the Free Software
+Foundation.  If the Program does not specify a version number of the
+GNU Affero General Public License, you may choose any version ever published
+by the Free Software Foundation.
+
+  If the Program specifies that a proxy can decide which future
+versions of the GNU Affero General Public License can be used, that proxy's
+public statement of acceptance of a version permanently authorizes you
+to choose that version for the Program.
+
+  Later license versions may give you additional or different
+permissions.  However, no additional obligations are imposed on any
+author or copyright holder as a result of your choosing to follow a
+later version.
+
+  15. Disclaimer of Warranty.
+
+  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY
+APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY
+OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM
+IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF
+ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
+
+  16. Limitation of Liability.
+
+  IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
+WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
+THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY
+GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE
+USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF
+DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD
+PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS),
+EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGES.
+
+  17. Interpretation of Sections 15 and 16.
+
+  If the disclaimer of warranty and limitation of liability provided
+above cannot be given local legal effect according to their terms,
+reviewing courts shall apply local law that most closely approximates
+an absolute waiver of all civil liability in connection with the
+Program, unless a warranty or assumption of liability accompanies a
+copy of the Program in return for a fee.
+
+                     END OF TERMS AND CONDITIONS
+
+            How to Apply These Terms to Your New Programs
+
+  If you develop a new program, and you want it to be of the greatest
+possible use to the public, the best way to achieve this is to make it
+free software which everyone can redistribute and change under these terms.
+
+  To do so, attach the following notices to the program.  It is safest
+to attach them to the start of each source file to most effectively
+state the exclusion of warranty; and each file should have at least
+the "copyright" line and a pointer to where the full notice is found.
+
+    <one line to give the program's name and a brief idea of what it does.>
+    Copyright (C) <year>  <name of author>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+Also add information on how to contact you by electronic and paper mail.
+
+  If your software can interact with users remotely through a computer
+network, you should also make sure that it provides a way for users to
+get its source.  For example, if your program is a web application, its
+interface could display a "Source" link that leads users to an archive
+of the code.  There are many ways you could offer source, and different
+solutions will be better for different programs; see section 13 for the
+specific requirements.
+
+  You should also get your employer (if you work as a programmer) or school,
+if any, to sign a "copyright disclaimer" for the program, if necessary.
+For more information on this, and how to apply and follow the GNU AGPL, see
+<https://www.gnu.org/licenses/>.
+
+
+================================================
+FILE: Makefile
+================================================
+.DEFAULT_GOAL := help
+BOARD := m5stack-nanoc6
+PROJECT := tesla-ble
+TARGET := $(PROJECT)-$(BOARD).yml
+HOST_SUFFIX := ""
+
+compile: .esphome/build/$(PROJECT)/.pioenvs/$(PROJECT)/firmware.bin .esphome/build/$(PROJECT)/$(TARGET).touchfile  ## Read the configuration and compile the binary.
+
+.esphome/build/$(PROJECT)/$(TARGET).touchfile: .venv/touchfile $(TARGET) packages/*.yml boards/$(BOARD).yml  ## Validate the configuration and create a binary.
+	. .venv/bin/activate; esphome compile $(TARGET)
+	touch .esphome/build/$(TARGET).touchfile
+
+.esphome/build/$(PROJECT)/.pioenvs/$(PROJECT)/firmware.bin: .esphome/build/$(PROJECT)/$(TARGET).touchfile ## Create the binary.
+
+upload: .esphome/build/$(PROJECT)/.pioenvs/$(PROJECT)/firmware.bin ## Validate the configuration, create a binary, upload it, and start logs.
+	if [ "$(HOST_SUFFIX)" = "" ]; then \
+		. .venv/bin/activate; esphome run $(TARGET); \
+	else \
+		. .venv/bin/activate; esphome run $(TARGET) --device $(PROJECT)$(HOST_SUFFIX); \
+	fi
+
+logs: .venv/touchfile
+	if [ "$(HOST_SUFFIX)" = "" ]; then \
+		. .venv/bin/activate; esphome logs $(TARGET); \
+	else \
+		. .venv/bin/activate; esphome logs $(TARGET) --device $(PROJECT)$(HOST_SUFFIX); \
+	fi
+
+deps: .venv/touchfile ## Create the virtual environment and install the requirements.
+
+.venv/touchfile: requirements.txt
+	test -d .venv || python -m venv .venv
+	. .venv/bin/activate && pip install -Ur requirements.txt
+	touch .venv/touchfile
+
+.PHONY: clean
+clean: ## Remove the virtual environment and the esphome build directory
+	rm -rf .venv
+	rm -rf .esphome
+
+.PHONY: help
+help: ## Show help messages for make targets
+	@grep -E '^[a-zA-\/Z_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) \
+		| sort \
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[32m%-30s\033[0m %s\n", $$1, $$2}'
+
+
+compile_docker: ## Compile the binary using docker
+	docker run --rm -v $(PWD):/config ghcr.io/esphome/esphome compile /config/$(TARGET)
+	touch .esphome/build/$(TARGET).touchfile
+
+
+
+================================================
+FILE: requirements.txt
+================================================
+esphome==2025.10.4
+
+
+
+================================================
+FILE: secrets.yaml.example
+================================================
+wifi_ssid: "your-wifi-ssid"
+wifi_password: "your-wifi-password"
+wifi_hotspot_password: "12345678"
+ota_password: ""
+api_encryption_key: "Cg/+mx6ZdH2QBdrmrKtg/zmG0TK/IDHBBr3DUJDXKpo=" # random key from https://esphome.io/components/api.html#configuration-variables
+ble_mac_address: "A0:B1:C2:D3:E4:F5"
+tesla_vin: "LRW30123456789ABC" # mock VIN example (it is NOT the BLE beacon name!)
+
+
+
+================================================
+FILE: tesla-ble.example.yml
+================================================
+substitutions:
+  # Note substitutions in your yaml will override those here
+  friendly_name: Tesla BLE
+  device_name: tesla-ble
+  device_description: Tesla BLE
+  ble_mac_address: !secret ble_mac_address # note this and the following are mandatory and pulled from the secrets file
+  tesla_vin: !secret tesla_vin
+  charging_amps_max: "32"
+
+# The following shows the default board and variant settings. 
+# Uncomment and changing them is only needed if they are not appropriate for your board (see read.me documentation for support):
+  #board: "esp32dev"
+  #variant: "ESP32"
+
+api:
+  encryption:
+    key: xxxxxxxxxxxxx= # use "key: !secret your_secret_key_name" for greater security
+
+packages:
+  base:  github://PedroKTFC/esphome-tesla-ble/packages/base.yml
+  common: github://PedroKTFC/esphome-tesla-ble/packages/common.yml
+  project: github://PedroKTFC/esphome-tesla-ble/packages/project.yml
+  client: github://PedroKTFC/esphome-tesla-ble/packages/client.yml
+  # listener: github://PedroKTFC/esphome-tesla-ble/packages/listener.yml # Uncomment this to scan find your VIN BLE MAC address
+  # language: github://PedroKTFC/esphome-tesla-ble/packages/language_hu.yml # Uncomment this to translate the entity names to your language. If yours is missing, submit a PR here!
+
+# The following shows how to change the name of a sensor and how to change any of the parameters.
+# tesla_ble_vehicle: # THIS LINE MUST BE UNCOMMENTED IF ANY OF THE CHANGES BELOW ARE WANTED
+
+# You can change any sensor name in Home Assistant. However you can also change them here if it is more convenient for you.
+# For a list of all sensors etc, see the file client.yml in the packages directory.
+#  odometer: # miles by default, edit the entity in home assistant if you need km
+#    name: "Odometro" # Rename if desired
+# End of renaming
+
+# At the time of writing, these are set to the default values. If you require a different value, uncomment and edit the value
+#  update_interval: 10s # Base polling interval, used for VCSEC sensors
+#  post_wake_poll_time: 300 # How long to poll for data after car awakes at poll_data_period speed (s)
+#  poll_data_period: 60 # Polling interval after awakening during post_wake_poll_time interval (s)
+#  poll_charging_period: 10 # Period to poll for data when charging (s)
+#  poll_asleep_period: 60 # Period to poll for data when asleep (s)
+#  ble_disconnected_min_time: 300 # Minimum time BLE must be disconnected before sensors are Unknown (s)
+#  fast_poll_if_unlocked: 1 # if != 0, fast polls are enabled when unlocked
+
+
+
+================================================
+FILE: .dockerignore
+================================================
+.git
+.venv
+.vscode
+.esphome
+
+
+
+================================================
+FILE: boards/m5stack-atoms3.yml
+================================================
+substitutions:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+
+# Board specific entities
+# Output that blinks the LED
+output:
+  - platform: template
+    id: status_output
+    type: binary
+    write_action:
+    - if:
+        condition:
+          lambda: return (state);
+        then:
+          - light.turn_on:
+              id: led
+              brightness: 70%
+              red: 100%
+              green: 0%
+              blue: 0%
+        else:
+          - light.turn_off: led
+
+light:
+  # Enable status LED
+  - platform: status_led
+    output: status_output
+    name: "Status Led"
+    entity_category: diagnostic
+
+  #G35=RGB WS2812C-2020
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: 35
+    num_leds: 4
+    # RMT 0 channels will be occupied by IR - Not Supported on IDF 5.x and onwards
+    # rmt_channel: 1
+    chipset: ws2812
+    id: led
+    name: "Led"
+    entity_category: diagnostic
+
+#G41=Button
+binary_sensor:
+  - platform: gpio
+    name: Button
+    entity_category: diagnostic
+    pin:
+      number: GPIO41
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    filters:
+      - delayed_off: 10ms
+
+
+
+================================================
+FILE: boards/m5stack-nanoc6.yml
+================================================
+##--- NOTE -------------------------------------------------------------##
+# This file is not needed and not used in this repo configuration.       #
+# It was taken over by forking the original yoziru repo.                 #
+# In case a M5stack Nano C6 is used, nescessary config can be made in    #
+#   the root yaml file (tesla-ble.example.yml) as described in the       #
+#   read.me.                                                             #
+##----------------------------------------------------------------------##
+
+
+substitutions:
+  board: esp32-c6-devkitm-1
+  variant: esp32c6
+  flash_size: 4MB
+
+esp32:
+  framework:
+    sdkconfig_options:
+      CONFIG_OPENTHREAD_ENABLED: n
+      CONFIG_ENABLE_WIFI_STATION: y
+      CONFIG_USE_MINIMAL_MDNS: y
+      CONFIG_ESPTOOLPY_FLASHSIZE_4MB: y
+
+# Board specific entities
+light:
+  - platform: status_led
+    name: "Status LED"
+    entity_category: diagnostic
+    pin: GPIO7
+
+  #G20=RGB WS2812
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: GPIO20
+    num_leds: 4
+    # RMT 0 channels will be occupied by IR - Not Supported on IDF 5.x and onwards
+    # rmt_channel: 1 
+    chipset: ws2812
+    name: "RGB LED"
+    entity_category: diagnostic
+    power_supply: rgbpwr
+
+power_supply:
+  - id: 'rgbpwr'
+    enable_on_boot: true
+    pin: GPIO19
+    enable_time: 10ms
+    keep_on_time: 10ms
+
+#G9=Button
+binary_sensor:
+  - platform: gpio
+    name: Button
+    entity_category: diagnostic
+    pin:
+      number: GPIO9
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    filters:
+      - delayed_off: 10ms
+
+
+
+================================================
+FILE: components/tesla_ble_listener/__init__.py
+================================================
+import esphome.codegen as cg
+import esphome.config_validation as cv
+from esphome.components import esp32_ble_tracker
+from esphome.const import CONF_ID
+
+CODEOWNERS = ["@yoziru"]
+DEPENDENCIES = ["esp32_ble_tracker"]
+CONF_VIN = "vin"
+
+tesla_ble_listener_ns = cg.esphome_ns.namespace("tesla_ble_listener")
+TeslaBLEListener = tesla_ble_listener_ns.class_(
+    "TeslaBLEListener", esp32_ble_tracker.ESPBTDeviceListener
+)
+
+CONFIG_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(): cv.declare_id(TeslaBLEListener),
+        cv.Required(CONF_VIN): cv.string,
+    }
+).extend(esp32_ble_tracker.ESP_BLE_DEVICE_SCHEMA)
+
+
+def to_code(config):
+    var = cg.new_Pvariable(config[CONF_ID])
+    yield esp32_ble_tracker.register_ble_device(var, config)
+
+    cg.add(var.set_vin(config[CONF_VIN]))
+
+
+
+================================================
+FILE: components/tesla_ble_listener/tesla_ble_listener.cpp
+================================================
+#include "tesla_ble_listener.h"
+#include "esphome/core/log.h"
+#include "mbedtls/sha1.h"
+#include <string>
+#include <cinttypes>
+
+namespace esphome
+{
+  namespace tesla_ble_listener
+  {
+    static const char *const TAG = "tesla_ble_listener";
+
+    std::string get_vin_advertisement_name(const char *vin)
+    {
+      // * BLE advertisement local name: `S + <ID> + C`, where `<ID>` is the
+      //  lower-case hex-encoding of the first eight bytes of the SHA1 digest of the
+      //  Vehicle Identification Number (VIN). For example, If the VIN is
+      //  `5YJS0000000000000`, then the BLE advertisement Local Name is
+      //  `S1a87a5a75f3df858C`.
+
+      unsigned char vin_sha1[20];
+      size_t vin_length = 17; // Assuming standard VIN length
+      int return_code = mbedtls_sha1((const unsigned char *)vin, vin_length, vin_sha1);
+      if (return_code != 0)
+      {
+        ESP_LOGE(TAG, "Failed to calculate SHA1 of VIN");
+        return "";
+      }
+
+      char result[19]; // 'S' + 16 hex chars + 'C' + null terminator
+      result[0] = 'S';
+      for (int i = 0; i < 8; i++)
+      {
+        snprintf(&result[1 + i * 2], 3, "%02x", vin_sha1[i]);
+      }
+      result[17] = 'C';
+      result[18] = '\0'; // Null terminator for safe printing
+
+      std::string result_str(result);
+      ESP_LOGD(TAG, "VIN advertisement name: %s", result_str.c_str());
+      return result_str;
+    }
+
+    bool TeslaBLEListener::parse_device(const esp32_ble_tracker::ESPBTDevice &device)
+    {
+      ESP_LOGD(TAG, "Parsing device: [%s]: %s", device.address_str().c_str(), device.get_name().c_str());
+
+      if (device.get_name() == this->vin_ad_name_)
+      {
+        ESP_LOGI(TAG, "Found Tesla vehicle | Name: %s | MAC: %s", device.get_name().c_str(), device.address_str().c_str());
+        return true;
+      }
+
+      return false;
+    }
+  } // namespace tesla_ble_listener
+} // namespace esphome
+
+
+
+================================================
+FILE: components/tesla_ble_listener/tesla_ble_listener.h
+================================================
+#pragma once
+
+#include "esphome/core/component.h"
+#include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
+
+namespace esphome
+{
+  namespace tesla_ble_listener
+  {
+
+    std::string get_vin_advertisement_name(const char *vin);
+
+    class TeslaBLEListener : public esp32_ble_tracker::ESPBTDeviceListener
+    {
+    public:
+      std::string vin_ad_name_;
+
+      bool parse_device(const esp32_ble_tracker::ESPBTDevice &device) override;
+      void set_vin(const char *vin) { vin_ad_name_ = get_vin_advertisement_name(vin); }
+    };
+
+  } // namespace tesla_ble_listener
+} // namespace esphome
+
+
+
+================================================
+FILE: components/tesla_ble_vehicle/__init__.py
+================================================
+import esphome.codegen as cg
+import esphome.config_validation as cv
+from esphome.components import ble_client, binary_sensor, text_sensor, sensor
+from esphome.const import CONF_ID
+
+CODEOWNERS = ["@PedroKTFC"]
+DEPENDENCIES = ["ble_client"]
+
+tesla_ble_vehicle_ns = cg.esphome_ns.namespace("tesla_ble_vehicle")
+TeslaBLEVehicle = tesla_ble_vehicle_ns.class_(
+    "TeslaBLEVehicle", cg.PollingComponent, ble_client.BLEClientNode
+)
+
+AUTO_LOAD = ["binary_sensor"]
+CONF_VIN = "vin"
+CONF_IS_ASLEEP = "is_asleep"
+CONF_IS_UNLOCKED = "is_unlocked"
+CONF_IS_USER_PRESENT = "is_user_present"
+CONF_IS_CHARGE_FLAP_OPEN = "is_charge_flap_open"
+CONF_SHIFT_STATE = "shift_state"
+CONF_DEFROST_STATE = "defrost_state"
+CONF_BOOT_STATE = "is_boot_open"
+CONF_FRUNK_STATE = "is_frunk_open"
+CONF_CHARGE_STATE = "charge_state"
+CONF_ODOMETER = "odometer"
+CONF_CHARGE_CURRENT = "charge_current"
+CONF_CHARGE_VOLTAGE = "charge_voltage"
+CONF_CHARGE_POWER = "charge_power"
+CONF_MAX_SOC = "max_soc"
+CONF_MAX_AMPS = "max_amps"
+CONF_MINS_TO_LIMIT = "mins_to_limit"
+CONF_BATTERY_RANGE = "battery_range"
+CONF_CHARGING_STATE = "charging_state"
+CONF_CHARGE_ENERGY_ADDED = "charge_energy_added"
+CONF_CHARGE_DISTANCE_ADDED = "charge_distance_added"
+CONF_LAST_UPDATE = "last_update"
+CONF_IS_CLIMATE_ON = "is_climate_on"
+CONF_INTERNAL_TEMP = "internal_temp"
+CONF_EXTERNAL_TEMP = "external_temp"
+CONF_WINDOWS_STATE = "windows_state"
+CONF_POST_WAKE_POLL_TIME = "post_wake_poll_time" # How long to poll for data after car awakes (s)
+CONF_POLL_DATA_PERIOD = "poll_data_period" # Normal period when polling for data when not asleep (s)
+CONF_POLL_ASLEEP_PERIOD = "poll_asleep_period" # Period to poll for data when asleep (s)
+CONF_POLL_CHARGING_PERIOD = "poll_charging_period" # Period to poll for data when charging (s)
+CONF_BLE_DISCONNECTED_MIN_TIME = "ble_disconnected_min_time" # Minimum time BLE must be disconnected before sensors are Unknown (s)
+CONF_FAST_POLL_IF_UNLOCKED = "fast_poll_if_unlocked" # if != 0, fast polls are enabled when unlocked
+CONF_WAKE_ON_BOOT = "wake_on_boot" # != 0 wakes car on device boot
+
+CONFIG_SCHEMA = (
+    cv.Schema(
+        {
+            cv.GenerateID(CONF_ID): cv.declare_id(TeslaBLEVehicle),
+            # add support to set VIN (required)
+            cv.Required(CONF_VIN): cv.string,
+            cv.Optional(CONF_POST_WAKE_POLL_TIME): cv.uint16_t,
+            cv.Optional(CONF_POLL_DATA_PERIOD): cv.uint16_t,
+            cv.Optional(CONF_POLL_ASLEEP_PERIOD): cv.uint16_t,
+            cv.Optional(CONF_POLL_CHARGING_PERIOD): cv.uint16_t,
+            cv.Optional(CONF_BLE_DISCONNECTED_MIN_TIME): cv.uint16_t,
+            cv.Optional(CONF_FAST_POLL_IF_UNLOCKED): cv.uint16_t,
+            cv.Optional(CONF_WAKE_ON_BOOT): cv.uint16_t,
+            cv.Optional(CONF_IS_ASLEEP): binary_sensor.binary_sensor_schema(
+                icon="mdi:sleep"
+            ).extend(),
+            cv.Optional(CONF_IS_UNLOCKED): binary_sensor.binary_sensor_schema(
+                device_class=binary_sensor.DEVICE_CLASS_LOCK,
+            ).extend(),
+            cv.Optional(CONF_IS_USER_PRESENT): binary_sensor.binary_sensor_schema(
+                icon="mdi:account-check", device_class=binary_sensor.DEVICE_CLASS_OCCUPANCY
+            ).extend(),
+            cv.Optional(CONF_IS_CHARGE_FLAP_OPEN): binary_sensor.binary_sensor_schema(
+                icon="mdi:ev-plug-tesla", device_class=binary_sensor.DEVICE_CLASS_DOOR
+            ).extend(),
+            cv.Optional(CONF_DEFROST_STATE): text_sensor.text_sensor_schema(
+                icon="mdi:snowflake-melt"
+            ).extend(),
+            cv.Optional(CONF_SHIFT_STATE): text_sensor.text_sensor_schema(
+                icon="mdi:car-shift-pattern"
+            ).extend(),
+            cv.Optional(CONF_BOOT_STATE): binary_sensor.binary_sensor_schema(
+                icon="mdi:car-back", device_class=binary_sensor.DEVICE_CLASS_DOOR
+            ).extend(),
+            cv.Optional(CONF_FRUNK_STATE): binary_sensor.binary_sensor_schema(
+                icon="mdi:car", device_class=binary_sensor.DEVICE_CLASS_DOOR
+            ).extend(),
+            cv.Optional(CONF_CHARGE_STATE): sensor.sensor_schema(
+                icon="mdi:battery-medium", device_class=sensor.DEVICE_CLASS_BATTERY,
+                unit_of_measurement="%"
+            ).extend(),
+            cv.Optional(CONF_ODOMETER): sensor.sensor_schema(
+                icon="mdi:counter", device_class=sensor.DEVICE_CLASS_DISTANCE,
+                accuracy_decimals=2, unit_of_measurement="mi"
+            ).extend(),
+            cv.Optional(CONF_CHARGE_DISTANCE_ADDED): sensor.sensor_schema(
+                icon="mdi:map-marker-distance", device_class=sensor.DEVICE_CLASS_DISTANCE,
+                accuracy_decimals=2, unit_of_measurement="mi"
+            ).extend(),
+            cv.Optional(CONF_CHARGE_ENERGY_ADDED): sensor.sensor_schema(
+                icon="mdi:battery-positive", device_class=sensor.DEVICE_CLASS_ENERGY_STORAGE,
+                accuracy_decimals=2, unit_of_measurement="kWh"
+            ).extend(),
+            cv.Optional(CONF_CHARGE_CURRENT): sensor.sensor_schema(
+                icon="mdi:current-ac", device_class=sensor.DEVICE_CLASS_CURRENT,
+                unit_of_measurement="A"
+            ).extend(),
+            cv.Optional(CONF_CHARGE_VOLTAGE): sensor.sensor_schema(
+                icon="mdi:flash-triangle", device_class=sensor.DEVICE_CLASS_VOLTAGE,
+                unit_of_measurement="V"
+            ).extend(),
+            cv.Optional(CONF_CHARGE_POWER): sensor.sensor_schema(
+                icon="mdi:lightning-bolt-circle", device_class=sensor.DEVICE_CLASS_POWER,
+                unit_of_measurement="kW"
+            ).extend(),
+            cv.Optional(CONF_MAX_SOC): sensor.sensor_schema(
+                icon="mdi:battery-lock", device_class=sensor.DEVICE_CLASS_BATTERY,
+                unit_of_measurement="%"
+            ).extend(),
+            cv.Optional(CONF_MAX_AMPS): sensor.sensor_schema(
+                icon="mdi:current-ac", device_class=sensor.DEVICE_CLASS_CURRENT,
+                unit_of_measurement="A"
+            ).extend(),
+            cv.Optional(CONF_MINS_TO_LIMIT): sensor.sensor_schema(
+                icon="mdi:timer-sand", device_class=sensor.DEVICE_CLASS_DURATION,
+                unit_of_measurement="min"
+            ).extend(),
+            cv.Optional(CONF_BATTERY_RANGE): sensor.sensor_schema(
+                icon="mdi:gauge", device_class=sensor.DEVICE_CLASS_DISTANCE,
+                accuracy_decimals=2, unit_of_measurement="mi"
+            ).extend(),
+            cv.Optional(CONF_CHARGING_STATE): text_sensor.text_sensor_schema(
+                icon="mdi:ev-station"
+            ).extend(),
+            cv.Optional(CONF_LAST_UPDATE): text_sensor.text_sensor_schema(
+                icon="mdi:update"
+            ).extend(),
+            cv.Optional(CONF_IS_CLIMATE_ON): binary_sensor.binary_sensor_schema(
+                icon="mdi:fan"
+            ).extend(),
+            cv.Optional(CONF_WINDOWS_STATE): binary_sensor.binary_sensor_schema(
+                icon="mdi:car-door", device_class=binary_sensor.DEVICE_CLASS_WINDOW
+            ).extend(),
+            cv.Optional(CONF_INTERNAL_TEMP): sensor.sensor_schema(
+                icon="mdi:thermometer", device_class=sensor.DEVICE_CLASS_TEMPERATURE,
+                accuracy_decimals=1, unit_of_measurement="°C"
+            ).extend(),
+            cv.Optional(CONF_EXTERNAL_TEMP): sensor.sensor_schema(
+                icon="mdi:sun-thermometer-outline", device_class=sensor.DEVICE_CLASS_TEMPERATURE,
+                accuracy_decimals=1, unit_of_measurement="°C"
+            ).extend(),
+        }
+    )
+    .extend(cv.polling_component_schema("1min"))
+    .extend(ble_client.BLE_CLIENT_SCHEMA)
+)
+
+async def to_code(config):
+    var = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(var, config)
+    await ble_client.register_ble_node(var, config)
+
+    cg.add(var.set_vin(config[CONF_VIN]))
+    cg.add(var.load_polling_parameters(config[CONF_POST_WAKE_POLL_TIME], config[CONF_POLL_DATA_PERIOD],
+           config[CONF_POLL_ASLEEP_PERIOD], config[CONF_POLL_CHARGING_PERIOD], config[CONF_BLE_DISCONNECTED_MIN_TIME],
+           config[CONF_FAST_POLL_IF_UNLOCKED], config[CONF_WAKE_ON_BOOT]))
+
+    if CONF_IS_ASLEEP in config:
+        conf = config[CONF_IS_ASLEEP]
+        bs = await binary_sensor.new_binary_sensor(conf)
+        cg.add(var.set_binary_sensor_is_asleep(bs))
+    if CONF_IS_UNLOCKED in config:
+        conf = config[CONF_IS_UNLOCKED]
+        bs = await binary_sensor.new_binary_sensor(conf)
+        cg.add(var.set_binary_sensor_is_unlocked(bs))
+    if CONF_IS_USER_PRESENT in config:
+        conf = config[CONF_IS_USER_PRESENT]
+        bs = await binary_sensor.new_binary_sensor(conf)
+        cg.add(var.set_binary_sensor_is_user_present(bs))
+    if CONF_IS_CHARGE_FLAP_OPEN in config:
+        conf = config[CONF_IS_CHARGE_FLAP_OPEN]
+        bs = await binary_sensor.new_binary_sensor(conf)
+        cg.add(var.set_binary_sensor_is_charge_flap_open(bs))
+    if CONF_SHIFT_STATE in config:
+        conf = config[CONF_SHIFT_STATE]
+        ts = await text_sensor.new_text_sensor(conf)
+        cg.add(var.set_text_sensor_shift_state(ts))
+    if CONF_DEFROST_STATE in config:
+        conf = config[CONF_DEFROST_STATE]
+        ts = await text_sensor.new_text_sensor(conf)
+        cg.add(var.set_text_sensor_defrost_state(ts))
+    if CONF_BOOT_STATE in config:
+        conf = config[CONF_BOOT_STATE]
+        bs = await binary_sensor.new_binary_sensor(conf)
+        cg.add(var.set_binary_sensor_is_boot_open(bs))
+    if CONF_FRUNK_STATE in config:
+        conf = config[CONF_FRUNK_STATE]
+        bs = await binary_sensor.new_binary_sensor(conf)
+        cg.add(var.set_binary_sensor_is_frunk_open(bs))
+    if CONF_CHARGE_STATE in config:
+        conf = config[CONF_CHARGE_STATE]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_charge_state(ss))
+    if CONF_ODOMETER in config:
+        conf = config[CONF_ODOMETER]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_odometer_state(ss))
+    if CONF_CHARGE_CURRENT in config:
+        conf = config[CONF_CHARGE_CURRENT]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_charge_current_state(ss))
+    if CONF_CHARGE_VOLTAGE in config:
+        conf = config[CONF_CHARGE_VOLTAGE]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_charge_voltage_state(ss))
+    if CONF_CHARGE_POWER in config:
+        conf = config[CONF_CHARGE_POWER]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_charge_power_state(ss))
+    if CONF_MAX_SOC in config:
+        conf = config[CONF_MAX_SOC]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_max_soc_state(ss))
+    if CONF_MAX_AMPS in config:
+        conf = config[CONF_MAX_AMPS]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_max_amps_state(ss))
+    if CONF_MINS_TO_LIMIT in config:
+        conf = config[CONF_MINS_TO_LIMIT]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_mins_to_limit_state(ss))
+    if CONF_BATTERY_RANGE in config:
+        conf = config[CONF_BATTERY_RANGE]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_battery_range_state(ss))
+    if CONF_CHARGE_ENERGY_ADDED in config:
+        conf = config[CONF_CHARGE_ENERGY_ADDED]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_charge_energy_added_state(ss))
+    if CONF_CHARGE_DISTANCE_ADDED in config:
+        conf = config[CONF_CHARGE_DISTANCE_ADDED]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_charge_distance_added_state(ss))
+    if CONF_CHARGING_STATE in config:
+        conf = config[CONF_CHARGING_STATE]
+        ts = await text_sensor.new_text_sensor(conf)
+        cg.add(var.set_text_sensor_charging_state(ts))
+    if CONF_LAST_UPDATE in config:
+        conf = config[CONF_LAST_UPDATE]
+        ts = await text_sensor.new_text_sensor(conf)
+        cg.add(var.set_text_sensor_last_update_state(ts))
+    if CONF_IS_CLIMATE_ON in config:
+        conf = config[CONF_IS_CLIMATE_ON]
+        bs = await binary_sensor.new_binary_sensor(conf)
+        cg.add(var.set_binary_sensor_is_climate_on(bs))
+    if CONF_WINDOWS_STATE in config:
+        conf = config[CONF_WINDOWS_STATE]
+        bs = await binary_sensor.new_binary_sensor(conf)
+        cg.add(var.set_binary_sensor_windows_state(bs))
+    if CONF_INTERNAL_TEMP in config:
+        conf = config[CONF_INTERNAL_TEMP]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_internal_temp_state(ss))
+    if CONF_EXTERNAL_TEMP in config:
+        conf = config[CONF_EXTERNAL_TEMP]
+        ss = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_external_temp_state(ss))
+
+
+
+================================================
+FILE: components/tesla_ble_vehicle/log.cpp
+================================================
+#include <inttypes.h>
+#include <string.h>
+
+#include <esphome/core/helpers.h>
+#include <esphome/core/log.h>
+
+#include <car_server.pb.h>
+#include <signatures.pb.h>
+#include <universal_message.pb.h>
+#include <vcsec.pb.h>
+
+using namespace esphome;
+
+// Helper function to convert UniversalMessage_OperationStatus_E enum to string
+const char *operation_status_to_string(UniversalMessage_OperationStatus_E status)
+{
+    switch (status)
+    {
+    case UniversalMessage_OperationStatus_E_OPERATIONSTATUS_OK:
+        return "OK";
+    case UniversalMessage_OperationStatus_E_OPERATIONSTATUS_WAIT:
+        return "WAIT";
+    case UniversalMessage_OperationStatus_E_OPERATIONSTATUS_ERROR:
+        return "ERROR";
+    default:
+        return "UNKNOWN_STATUS";
+    }
+}
+
+const char *vcsec_operation_status_to_string(VCSEC_OperationStatus_E status)
+{
+    switch (status)
+    {
+    case VCSEC_OperationStatus_E_OPERATIONSTATUS_OK:
+        return "OK";
+    case VCSEC_OperationStatus_E_OPERATIONSTATUS_WAIT:
+        return "WAIT";
+    case VCSEC_OperationStatus_E_OPERATIONSTATUS_ERROR:
+        return "ERROR";
+    default:
+        return "UNKNOWN_STATUS";
+    }
+}
+
+const char *information_request_type_to_string(VCSEC_InformationRequestType request_type)
+{
+    switch (request_type)
+    {
+    case VCSEC_InformationRequestType_INFORMATION_REQUEST_TYPE_GET_STATUS:
+        return "GET_STATUS";
+    case VCSEC_InformationRequestType_INFORMATION_REQUEST_TYPE_GET_WHITELIST_INFO:
+        return "GET_WHITELIST_INFO";
+    case VCSEC_InformationRequestType_INFORMATION_REQUEST_TYPE_GET_WHITELIST_ENTRY_INFO:
+        return "GET_WHITELIST_ENTRY_INFO";
+    default:
+        return "UNKNOWN_REQUEST_TYPE";
+    }
+}
+
+// Helper function to convert UniversalMessage_MessageFault_E enum to string
+const char *message_fault_to_string(UniversalMessage_MessageFault_E fault)
+{
+    switch (fault)
+    {
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_NONE:
+        return "ERROR_NONE";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_BUSY:
+        return "ERROR_BUSY";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_TIMEOUT:
+        return "ERROR_TIMEOUT";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_UNKNOWN_KEY_ID:
+        return "ERROR_UNKNOWN_KEY_ID";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_INACTIVE_KEY:
+        return "ERROR_INACTIVE_KEY";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_INVALID_SIGNATURE:
+        return "ERROR_INVALID_SIGNATURE";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_INVALID_TOKEN_OR_COUNTER:
+        return "ERROR_INVALID_TOKEN_OR_COUNTER";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_INSUFFICIENT_PRIVILEGES:
+        return "ERROR_INSUFFICIENT_PRIVILEGES";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_INVALID_DOMAINS:
+        return "ERROR_INVALID_DOMAINS";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_INVALID_COMMAND:
+        return "ERROR_INVALID_COMMAND";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_DECODING:
+        return "ERROR_DECODING";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_INTERNAL:
+        return "ERROR_INTERNAL";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_WRONG_PERSONALIZATION:
+        return "ERROR_WRONG_PERSONALIZATION";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_BAD_PARAMETER:
+        return "ERROR_BAD_PARAMETER";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_KEYCHAIN_IS_FULL:
+        return "ERROR_KEYCHAIN_IS_FULL";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_INCORRECT_EPOCH:
+        return "ERROR_INCORRECT_EPOCH";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_IV_INCORRECT_LENGTH:
+        return "ERROR_IV_INCORRECT_LENGTH";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_TIME_EXPIRED:
+        return "ERROR_TIME_EXPIRED";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_NOT_PROVISIONED_WITH_IDENTITY:
+        return "ERROR_NOT_PROVISIONED_WITH_IDENTITY";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_COULD_NOT_HASH_METADATA:
+        return "ERROR_COULD_NOT_HASH_METADATA";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_TIME_TO_LIVE_TOO_LONG:
+        return "ERROR_TIME_TO_LIVE_TOO_LONG";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_REMOTE_ACCESS_DISABLED:
+        return "ERROR_REMOTE_ACCESS_DISABLED";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_REMOTE_SERVICE_ACCESS_DISABLED:
+        return "ERROR_REMOTE_SERVICE_ACCESS_DISABLED";
+    case UniversalMessage_MessageFault_E_MESSAGEFAULT_ERROR_COMMAND_REQUIRES_ACCOUNT_CREDENTIALS:
+        return "ERROR_COMMAND_REQUIRES_ACCOUNT_CREDENTIALS";
+    default:
+        return "UNKNOWN_FAULT";
+    }
+}
+
+// Function to log UniversalMessage_MessageStatus
+void log_message_status(const char *tag, const UniversalMessage_MessageStatus *status)
+{
+    ESP_LOGE(tag, "  MessageStatus:");
+    ESP_LOGE(tag, "    operation_status: %s", operation_status_to_string(status->operation_status));
+    ESP_LOGE(tag, "    signed_message_fault: %s", message_fault_to_string(status->signed_message_fault));
+}
+
+const char *vssec_signed_message_information_to_string(VCSEC_SignedMessage_information_E information)
+{
+    switch (information)
+    {
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_NONE:
+        return "NONE";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_UNKNOWN:
+        return "UNKNOWN";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_NOT_ON_WHITELIST:
+        return "NOT_ON_WHITELIST";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_IV_SMALLER_THAN_EXPECTED:
+        return "IV_SMALLER_THAN_EXPECTED";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_INVALID_TOKEN:
+        return "INVALID_TOKEN";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_TOKEN_AND_COUNTER_INVALID:
+        return "TOKEN_AND_COUNTER_INVALID";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_AES_DECRYPT_AUTH:
+        return "AES_DECRYPT_AUTH";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_ECDSA_INPUT:
+        return "ECDSA_INPUT";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_ECDSA_SIGNATURE:
+        return "ECDSA_SIGNATURE";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_LOCAL_ENTITY_START:
+        return "LOCAL_ENTITY_START";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_LOCAL_ENTITY_RESULT:
+        return "LOCAL_ENTITY_RESULT";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_COULD_NOT_RETRIEVE_KEY:
+        return "COULD_NOT_RETRIEVE_KEY";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_COULD_NOT_RETRIEVE_TOKEN:
+        return "COULD_NOT_RETRIEVE_TOKEN";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_SIGNATURE_TOO_SHORT:
+        return "SIGNATURE_TOO_SHORT";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_TOKEN_IS_INCORRECT_LENGTH:
+        return "TOKEN_IS_INCORRECT_LENGTH";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_INCORRECT_EPOCH:
+        return "INCORRECT_EPOCH";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_IV_INCORRECT_LENGTH:
+        return "IV_INCORRECT_LENGTH";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_TIME_EXPIRED:
+        return "TIME_EXPIRED";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_NOT_PROVISIONED_WITH_IDENTITY:
+        return "NOT_PROVISIONED_WITH_IDENTITY";
+    case VCSEC_SignedMessage_information_E_SIGNEDMESSAGE_INFORMATION_FAULT_COULD_NOT_HASH_METADATA:
+        return "COULD_NOT_HASH_METADATA";
+    default:
+        return "UNKNOWN_INFORMATION";
+    }
+}
+
+const char *vssec_whitelist_operation_information_to_string(VCSEC_WhitelistOperation_information_E request_type)
+{
+    switch (request_type)
+    {
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_NONE:
+        return "NONE";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_UNDOCUMENTED_ERROR:
+        return "UNDOCUMENTED_ERROR";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_NO_PERMISSION_TO_REMOVE_ONESELF:
+        return "NO_PERMISSION_TO_REMOVE_ONESELF";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_KEYFOB_SLOTS_FULL:
+        return "KEYFOB_SLOTS_FULL";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_WHITELIST_FULL:
+        return "WHITELIST_FULL";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_NO_PERMISSION_TO_ADD:
+        return "NO_PERMISSION_TO_ADD";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_INVALID_PUBLIC_KEY:
+        return "INVALID_PUBLIC_KEY";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_NO_PERMISSION_TO_REMOVE:
+        return "NO_PERMISSION_TO_REMOVE";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_NO_PERMISSION_TO_CHANGE_PERMISSIONS:
+        return "NO_PERMISSION_TO_CHANGE_PERMISSIONS";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_ATTEMPTING_TO_ELEVATE_OTHER_ABOVE_ONESELF:
+        return "ATTEMPTING_TO_ELEVATE_OTHER_ABOVE_ONESELF";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_ATTEMPTING_TO_DEMOTE_SUPERIOR_TO_ONESELF:
+        return "ATTEMPTING_TO_DEMOTE_SUPERIOR_TO_ONESELF";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_ATTEMPTING_TO_REMOVE_OWN_PERMISSIONS:
+        return "ATTEMPTING_TO_REMOVE_OWN_PERMISSIONS";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_PUBLIC_KEY_NOT_ON_WHITELIST:
+        return "PUBLIC_KEY_NOT_ON_WHITELIST";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_ATTEMPTING_TO_ADD_KEY_THAT_IS_ALREADY_ON_THE_WHITELIST:
+        return "ATTEMPTING_TO_ADD_KEY_THAT_IS_ALREADY_ON_THE_WHITELIST";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_NOT_ALLOWED_TO_ADD_UNLESS_ON_READER:
+        return "NOT_ALLOWED_TO_ADD_UNLESS_ON_READER";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_FM_MODIFYING_OUTSIDE_OF_F_MODE:
+        return "FM_MODIFYING_OUTSIDE_OF_F_MODE";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_FM_ATTEMPTING_TO_ADD_PERMANENT_KEY:
+        return "FM_ATTEMPTING_TO_ADD_PERMANENT_KEY";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_FM_ATTEMPTING_TO_REMOVE_PERMANENT_KEY:
+        return "FM_ATTEMPTING_TO_REMOVE_PERMANENT_KEY";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_KEYCHAIN_WHILE_FS_FULL:
+        return "KEYCHAIN_WHILE_FS_FULL";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_ATTEMPTING_TO_ADD_KEY_WITHOUT_ROLE:
+        return "ATTEMPTING_TO_ADD_KEY_WITHOUT_ROLE";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_ATTEMPTING_TO_ADD_KEY_WITH_SERVICE_ROLE:
+        return "ATTEMPTING_TO_ADD_KEY_WITH_SERVICE_ROLE";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_NON_SERVICE_KEY_ATTEMPTING_TO_ADD_SERVICE_TECH:
+        return "NON_SERVICE_KEY_ATTEMPTING_TO_ADD_SERVICE_TECH";
+    case VCSEC_WhitelistOperation_information_E_WHITELISTOPERATION_INFORMATION_SERVICE_KEY_ATTEMPTING_TO_ADD_SERVICE_TECH_OUTSIDE_SERVICE_MODE:
+        return "SERVICE_KEY_ATTEMPTING_TO_ADD_SERVICE_TECH_OUTSIDE_SERVICE_MODE";
+    default:
+        return "UNKNOWN_REQUEST_TYPE";
+    }
+}
+
+// Function to convert UniversalMessage_Domain enum to string
+const char *domain_to_string(UniversalMessage_Domain domain)
+{
+    switch (domain)
+    {
+    case UniversalMessage_Domain_DOMAIN_BROADCAST:
+        return "DOMAIN_BROADCAST";
+    case UniversalMessage_Domain_DOMAIN_VEHICLE_SECURITY:
+        return "DOMAIN_VEHICLE_SECURITY";
+    case UniversalMessage_Domain_DOMAIN_INFOTAINMENT:
+        return "DOMAIN_INFOTAINMENT";
+    default:
+        return "UNKNOWN_DOMAIN";
+    }
+}
+
+const char *generic_error_to_string(Errors_GenericError_E error)
+{
+    switch (error)
+    {
+    case Errors_GenericError_E_GENERICERROR_NONE:
+        return "NONE";
+    case Errors_GenericError_E_GENERICERROR_UNKNOWN:
+        return "UNKNOWN";
+    case Errors_GenericError_E_GENERICERROR_CLOSURES_OPEN:
+        return "CLOSURES_OPEN";
+    case Errors_GenericError_E_GENERICERROR_ALREADY_ON:
+        return "ALREADY_ON";
+    case Errors_GenericError_E_GENERICERROR_DISABLED_FOR_USER_COMMAND:
+        return "DISABLED_FOR_USER_COMMAND";
+    case Errors_GenericError_E_GENERICERROR_VEHICLE_NOT_IN_PARK:
+        return "VEHICLE_NOT_IN_PARK";
+    case Errors_GenericError_E_GENERICERROR_UNAUTHORIZED:
+        return "UNAUTHORIZED";
+    case Errors_GenericError_E_GENERICERROR_NOT_ALLOWED_OVER_TRANSPORT:
+        return "NOT_ALLOWED_OVER_TRANSPORT";
+    default:
+        return "UNKNOWN_ERROR";
+    }
+}
+
+void log_destination(const char *tag,
+                     const char *direction,
+                     const UniversalMessage_Destination *dest)
+{
+    ESP_LOGD(tag, "Destination: %s", direction);
+    ESP_LOGD(tag, "  which_sub_destination: %d", dest->which_sub_destination);
+    switch (dest->which_sub_destination)
+    {
+    case UniversalMessage_Destination_domain_tag:
+        ESP_LOGD(tag, "  domain: %s", domain_to_string(dest->sub_destination.domain));
+        break;
+    case UniversalMessage_Destination_routing_address_tag:
+        ESP_LOGD(tag, "  routing_address: %s", format_hex(dest->sub_destination.routing_address.bytes, dest->sub_destination.routing_address.size).c_str());
+        break;
+    default:
+        ESP_LOGD(tag, "  unknown sub_destination");
+    }
+}
+
+void log_session_info_request(const char *tag, const UniversalMessage_SessionInfoRequest *req)
+{
+    ESP_LOGD(tag, "  SessionInfoRequest:");
+    ESP_LOGD(tag, "    public_key: %s", req->public_key.bytes);
+    ESP_LOGD(tag, "    challenge: %s", req->challenge.bytes);
+}
+
+void log_vehicle_data (const char *tag, const CarServer_VehicleData *req)
+{
+    ESP_LOGD (tag, "VehicleData:");
+    ESP_LOGD (tag, "    has_charge_state: %s", req->has_charge_state ? "true" : "false");
+    if (req->has_charge_state)
+    {
+        ESP_LOGD (tag, "    charge state = %ld", req->charge_state.optional_battery_level.battery_level);
+    }
+    if (req->has_drive_state)
+    {
+        std::string gear = "Unknown";
+        switch (req->drive_state.shift_state.which_type)
+        {
+        case CarServer_ShiftState_Invalid_tag:
+            gear = "Invalid";
+            break;
+        case CarServer_ShiftState_P_tag:
+            gear = "P";
+            break;
+        case CarServer_ShiftState_R_tag:
+            gear = "R";
+            break;
+        case CarServer_ShiftState_N_tag:
+            gear = "N";
+            break;
+        case CarServer_ShiftState_D_tag:
+            gear = "D";
+            break;
+        case CarServer_ShiftState_SNA_tag:
+            gear = "SNA";
+            break;
+        default:
+            gear = "Default";
+            break;
+        }
+        ESP_LOGD (tag, "    has_drive_state: ");
+        ESP_LOGD (tag, "      drive_state: %s", gear.c_str());
+    }
+}
+
+void log_session_info(const char *tag, const Signatures_SessionInfo *req)
+{
+    ESP_LOGD(tag, "SessionInfo:");
+    ESP_LOGD(tag, "  counter: %" PRIu32, req->counter);
+    ESP_LOGD(tag, "  publicKey: %s", format_hex(req->publicKey.bytes, req->publicKey.size).c_str());
+    ESP_LOGD(tag, "  epoch: %s", format_hex(req->epoch, 16).c_str());
+    ESP_LOGD(tag, "  clock_time: %" PRIu32, req->clock_time);
+    ESP_LOGD(tag, "  status: %s", req->status == Signatures_Session_Info_Status_SESSION_INFO_STATUS_OK ? "OK" : "KEY_NOT_ON_WHITELIST");
+}
+
+void log_aes_gcm_personalized_signature_data(const char *tag, const Signatures_AES_GCM_Personalized_Signature_Data *data)
+{
+    ESP_LOGD(tag, "    AES_GCM_Personalized_Signature_Data:");
+    ESP_LOGD(tag, "      epoch: %s", format_hex(data->epoch, 16).c_str());
+    ESP_LOGD(tag, "      nonce: %s", format_hex(data->nonce, 12).c_str());
+    ESP_LOGD(tag, "      counter: %" PRIu32, data->counter);
+    ESP_LOGD(tag, "      expires_at: %" PRIu32, data->expires_at);
+    ESP_LOGD(tag, "      tag: %s", format_hex(data->tag, 16).c_str());
+}
+
+void log_signature_data(const char *tag, const Signatures_SignatureData *sig)
+{
+    ESP_LOGD(tag, "  SignatureData:");
+    ESP_LOGD(tag, "    has_signer_identity: %s", sig->has_signer_identity ? "true" : "false");
+    if (sig->has_signer_identity)
+    {
+        ESP_LOGD(tag, "    signer_identity: ");
+        ESP_LOGD(tag, "      public_key: %s", format_hex(sig->signer_identity.identity_type.public_key.bytes, sig->signer_identity.identity_type.public_key.size).c_str());
+    }
+    ESP_LOGD(tag, "    which_sig_type: %d", sig->which_sig_type);
+    switch (sig->which_sig_type)
+    {
+    case Signatures_SignatureData_AES_GCM_Personalized_data_tag:
+        log_aes_gcm_personalized_signature_data(tag, &sig->sig_type.AES_GCM_Personalized_data);
+        break;
+    case Signatures_SignatureData_session_info_tag_tag:
+        ESP_LOGD(tag, "    session_info_tag: %s", format_hex(sig->sig_type.session_info_tag.tag.bytes, sig->sig_type.session_info_tag.tag.size).c_str());
+        break;
+    case Signatures_SignatureData_HMAC_Personalized_data_tag:
+        ESP_LOGD(tag, "    HMAC_Personalized_data: ");
+        ESP_LOGD(tag, "      epoch: %s", format_hex(sig->sig_type.HMAC_Personalized_data.epoch, 16).c_str());
+        ESP_LOGD(tag, "      counter: %" PRIu32, sig->sig_type.HMAC_Personalized_data.counter);
+        ESP_LOGD(tag, "      expires_at: %" PRIu32, sig->sig_type.HMAC_Personalized_data.expires_at);
+        ESP_LOGD(tag, "      tag: %s", format_hex(sig->sig_type.HMAC_Personalized_data.tag, 16).c_str());
+        break;
+    default:
+        ESP_LOGD(tag, "    unknown sig_type");
+    }
+}
+
+void log_information_request(const char *tag, const VCSEC_InformationRequest *msg)
+{
+    ESP_LOGD(tag, "VCSEC_InformationRequest:");
+    ESP_LOGD(tag, "  which_request: %d", msg->which_key);
+
+    ESP_LOGD(tag, "  informationRequestType: %s", information_request_type_to_string(msg->informationRequestType));
+    ESP_LOGD(tag, "  publicKeySHA1: %s", format_hex(msg->key.keyId.publicKeySHA1.bytes, msg->key.keyId.publicKeySHA1.size).c_str());
+    ESP_LOGD(tag, "  publicKey: %s", format_hex(msg->key.publicKey.bytes, msg->key.publicKey.size).c_str());
+    ESP_LOGD(tag, "  publicKeySHA1: %" PRIu32, msg->key.slot);
+}
+
+void log_routable_message(const char *tag, const UniversalMessage_RoutableMessage *msg)
+{
+    ESP_LOGD(tag, "UniversalMessage_RoutableMessage:");
+    ESP_LOGD(tag, "  has_to_destination: %s", msg->has_to_destination ? "true" : "false");
+    if (msg->has_to_destination)
+    {
+        log_destination(tag, "to_destination", &msg->to_destination);
+    }
+
+    ESP_LOGD(tag, "  has_from_destination: %s", msg->has_from_destination ? "true" : "false");
+    if (msg->has_from_destination)
+    {
+        log_destination(tag, "from_destination", &msg->from_destination);
+    }
+
+    ESP_LOGD(tag, "  which_payload: %d", msg->which_payload);
+    switch (msg->which_payload)
+    {
+    case UniversalMessage_RoutableMessage_protobuf_message_as_bytes_tag:
+        ESP_LOGD(tag, "  payload: protobuf_message_as_bytes (callback)");
+        // log byte array as string
+        ESP_LOGD(tag, "    payload: %s", format_hex(msg->payload.protobuf_message_as_bytes.bytes, msg->payload.protobuf_message_as_bytes.size).c_str());
+        break;
+    case UniversalMessage_RoutableMessage_session_info_request_tag:
+        ESP_LOGD(tag, "  payload: session_info_request");
+        log_session_info_request(tag, &msg->payload.session_info_request);
+        break;
+    case UniversalMessage_RoutableMessage_session_info_tag:
+        ESP_LOGD(tag, "  payload: session_info (callback)");
+        // log byte array as string
+        ESP_LOGD(tag, "    payload: %s", format_hex(msg->payload.session_info.bytes, msg->payload.session_info.size).c_str());
+        break;
+    default:
+        ESP_LOGD(tag, "  payload: unknown");
+    }
+
+    ESP_LOGD(tag, "  has_signedMessageStatus: %s", msg->has_signedMessageStatus ? "true" : "false");
+    if (msg->has_signedMessageStatus)
+    {
+        log_message_status(tag, &msg->signedMessageStatus);
+    }
+
+    ESP_LOGD(tag, "  which_sub_sigData: %d", msg->which_sub_sigData);
+    if (msg->which_sub_sigData == UniversalMessage_RoutableMessage_signature_data_tag)
+    {
+        log_signature_data(tag, &msg->sub_sigData.signature_data);
+    }
+
+    if (msg->request_uuid.size > 0)
+    {
+        ESP_LOGD(tag, "  request_uuid: %s", format_hex(msg->request_uuid.bytes, msg->request_uuid.size).c_str());
+    }
+    if (msg->uuid.size > 0)
+    {
+        ESP_LOGD(tag, "  uuid: %s", format_hex(msg->uuid.bytes, msg->uuid.size).c_str());
+    }
+    ESP_LOGD(tag, "  flags: %" PRIu32, msg->flags);
+}
+
+const char *closure_state_to_string(VCSEC_ClosureState_E state)
+{
+    switch (state)
+    {
+    case VCSEC_ClosureState_E_CLOSURESTATE_CLOSED:
+        return "CLOSED";
+    case VCSEC_ClosureState_E_CLOSURESTATE_OPEN:
+        return "OPEN";
+    case VCSEC_ClosureState_E_CLOSURESTATE_AJAR:
+        return "AJAR";
+    case VCSEC_ClosureState_E_CLOSURESTATE_UNKNOWN:
+        return "UNKNOWN";
+    case VCSEC_ClosureState_E_CLOSURESTATE_FAILED_UNLATCH:
+        return "FAILED_UNLATCH";
+    case VCSEC_ClosureState_E_CLOSURESTATE_OPENING:
+        return "OPENING";
+    case VCSEC_ClosureState_E_CLOSURESTATE_CLOSING:
+        return "CLOSING";
+    default:
+        return "UNKNOWN_STATE";
+    }
+}
+
+const char *vehicle_lock_state_to_string(VCSEC_VehicleLockState_E state)
+{
+    switch (state)
+    {
+    case VCSEC_VehicleLockState_E_VEHICLELOCKSTATE_UNLOCKED:
+        return "UNLOCKED";
+    case VCSEC_VehicleLockState_E_VEHICLELOCKSTATE_LOCKED:
+        return "LOCKED";
+    case VCSEC_VehicleLockState_E_VEHICLELOCKSTATE_INTERNAL_LOCKED:
+        return "INTERNAL_LOCKED";
+    case VCSEC_VehicleLockState_E_VEHICLELOCKSTATE_SELECTIVE_UNLOCKED:
+        return "SELECTIVE_UNLOCKED";
+    default:
+        return "UNKNOWN_STATE";
+    }
+}
+
+const char *vehicle_sleep_status_to_string(VCSEC_VehicleSleepStatus_E state)
+{
+    switch (state)
+    {
+    case VCSEC_VehicleSleepStatus_E_VEHICLE_SLEEP_STATUS_UNKNOWN:
+        return "UNKNOWN";
+    case VCSEC_VehicleSleepStatus_E_VEHICLE_SLEEP_STATUS_AWAKE:
+        return "AWAKE";
+    case VCSEC_VehicleSleepStatus_E_VEHICLE_SLEEP_STATUS_ASLEEP:
+        return "ASLEEP";
+    default:
+        return "UNKNOWN_STATE";
+    }
+}
+
+const char *user_presence_to_string(VCSEC_UserPresence_E state)
+{
+    switch (state)
+    {
+    case VCSEC_UserPresence_E_VEHICLE_USER_PRESENCE_UNKNOWN:
+        return "UNKNOWN";
+    case VCSEC_UserPresence_E_VEHICLE_USER_PRESENCE_NOT_PRESENT:
+        return "NOT_PRESENT";
+    case VCSEC_UserPresence_E_VEHICLE_USER_PRESENCE_PRESENT:
+        return "PRESENT";
+    default:
+        return "UNKNOWN_STATE";
+    }
+}
+
+void log_vehicle_status(const char *tag, const VCSEC_VehicleStatus *msg)
+{
+    ESP_LOGD(tag, "VCSEC_VehicleStatus:");
+    ESP_LOGD(tag, "  has_closureStatuses: %s", msg->has_closureStatuses ? "true" : "false");
+    if (msg->has_closureStatuses)
+    {
+        ESP_LOGD(tag, "  closureStatuses:");
+        ESP_LOGD(tag, "    frontDriverDoor: %s", closure_state_to_string(msg->closureStatuses.frontDriverDoor));
+        ESP_LOGD(tag, "    frontPassengerDoor: %s", closure_state_to_string(msg->closureStatuses.frontPassengerDoor));
+        ESP_LOGD(tag, "    rearDriverDoor: %s", closure_state_to_string(msg->closureStatuses.rearDriverDoor));
+        ESP_LOGD(tag, "    rearPassengerDoor: %s", closure_state_to_string(msg->closureStatuses.rearPassengerDoor));
+        ESP_LOGD(tag, "    rearTrunk: %s", closure_state_to_string(msg->closureStatuses.rearTrunk));
+        ESP_LOGD(tag, "    frontTrunk: %s", closure_state_to_string(msg->closureStatuses.frontTrunk));
+        ESP_LOGD(tag, "    chargePort: %s", closure_state_to_string(msg->closureStatuses.chargePort));
+    }
+    ESP_LOGD(tag, "  vehicleLockState: %s", vehicle_lock_state_to_string(msg->vehicleLockState));
+    ESP_LOGD(tag, "  vehicleSleepStatus: %s", vehicle_sleep_status_to_string(msg->vehicleSleepStatus));
+    ESP_LOGD(tag, "  userPresence: %s", user_presence_to_string(msg->userPresence));
+}
+
+void log_vssec_signed_message_status(const char *tag, const VCSEC_SignedMessage_status *status)
+{
+    ESP_LOGI(tag, "  SignedMessage status:");
+    ESP_LOGI(tag, "    counter: %" PRIu32, status->counter);
+    ESP_LOGI(tag, "    signed_message_information: %s", vssec_signed_message_information_to_string(status->signedMessageInformation));
+}
+
+void log_vssec_whitelist_operation_status(const char *tag, const VCSEC_WhitelistOperation_status *status)
+{
+    ESP_LOGI(tag, "  WhitelistOperation status:");
+    // has_signerOfOperation;
+    if (status->has_signerOfOperation)
+    {
+        ESP_LOGD(tag, "    signerOfOperation:");
+        ESP_LOGD(tag, "      public_key: %s", format_hex(status->signerOfOperation.publicKeySHA1.bytes, status->signerOfOperation.publicKeySHA1.size).c_str());
+    }
+    ESP_LOGI(tag, "    operation_status: %s", vcsec_operation_status_to_string(status->operationStatus));
+    ESP_LOGI(tag, "    information: %s", vssec_whitelist_operation_information_to_string(status->whitelistOperationInformation));
+}
+
+void log_vcsec_command_status(const char *tag, const VCSEC_CommandStatus *msg)
+{
+    ESP_LOGD(tag, "VCSEC_CommandStatus:");
+    ESP_LOGD(tag, "  commandStatus: %s", vcsec_operation_status_to_string(msg->operationStatus));
+
+    ESP_LOGD(tag, "  which_sub_message: %d", msg->which_sub_message);
+    switch (msg->which_sub_message)
+    {
+    case VCSEC_CommandStatus_signedMessageStatus_tag:
+        log_vssec_signed_message_status(tag, &msg->sub_message.signedMessageStatus);
+        break;
+    case VCSEC_CommandStatus_whitelistOperationStatus_tag:
+        log_vssec_whitelist_operation_status(tag, &msg->sub_message.whitelistOperationStatus);
+        break;
+    default:
+        ESP_LOGD(tag, "  unknown sub_message");
+    }
+}
+
+void carserver_result_reason_to_string(const char *tag, const CarServer_ResultReason *reason)
+{
+    ESP_LOGI(tag, "  ResultReason:");
+    ESP_LOGI(tag, "    which_reason: %d", reason->which_reason);
+    switch (reason->which_reason)
+    {
+    case CarServer_ResultReason_plain_text_tag:
+        ESP_LOGI(tag, "    plain_text: %s", reason->reason.plain_text);
+        break;
+    default:
+        ESP_LOGD(tag, "    unknown reason");
+    }
+}
+
+const char *carserver_operation_status_to_string(CarServer_OperationStatus_E status)
+{
+    switch (status)
+    {
+    case CarServer_OperationStatus_E_OPERATIONSTATUS_OK:
+        return "OK";
+    case CarServer_OperationStatus_E_OPERATIONSTATUS_ERROR:
+        return "ERROR";
+    default:
+        return "UNKNOWN_STATUS";
+    }
+}
+
+void log_carserver_response(const char *tag, const CarServer_Response *msg)
+{
+    ESP_LOGD(tag, "CarServerResponse:");
+    if (msg->has_actionStatus)
+    {
+        ESP_LOGD(tag, "  ActionStatus:");
+        ESP_LOGD(tag, "    result: %s", carserver_operation_status_to_string(msg->actionStatus.result));
+        if (msg->actionStatus.has_result_reason)
+        {
+            switch (msg->actionStatus.result_reason.which_reason)
+            {
+            case CarServer_ResultReason_plain_text_tag:
+                ESP_LOGI(tag, "    reason: %s", msg->actionStatus.result_reason.reason.plain_text);
+                break;
+            default:
+                ESP_LOGI(tag, "    unknown reason");
+            }
+        }
+    }
+    ESP_LOGD (tag, "  vehicleData:");
+    log_vehicle_data (tag, &msg->response_msg.vehicleData);
+    ESP_LOGD (tag, "    has_charge_state: %d", msg->response_msg.vehicleData.has_charge_state);
+    ESP_LOGD (tag, "    charge state = %ld", msg->response_msg.vehicleData.charge_state.optional_battery_level.battery_level);
+    ESP_LOGD (tag, "    has_climate_state: %d", msg->response_msg.vehicleData.has_climate_state);
+    ESP_LOGD (tag, "    has_drive_state: %d", msg->response_msg.vehicleData.has_drive_state);
+    ESP_LOGD (tag, "    has_location_state: %d", msg->response_msg.vehicleData.has_location_state);
+    ESP_LOGD (tag, "    has_closures_state: %d", msg->response_msg.vehicleData.has_closures_state);
+    ESP_LOGD (tag, "    has_charge_schedule_state: %d", msg->response_msg.vehicleData.has_charge_schedule_state);
+    ESP_LOGD (tag, "    has_preconditioning_schedule_state: %d", msg->response_msg.vehicleData.has_preconditioning_schedule_state);
+    ESP_LOGD (tag, "    has_tire_pressure_state: %d", msg->response_msg.vehicleData.has_tire_pressure_state);
+    ESP_LOGD (tag, "    has_media_state: %d", msg->response_msg.vehicleData.has_media_state);
+    ESP_LOGD (tag, "    has_media_detail_state: %d", msg->response_msg.vehicleData.has_media_detail_state);
+    ESP_LOGD (tag, "    has_software_update_state: %d", msg->response_msg.vehicleData.has_software_update_state);
+    ESP_LOGD (tag, "    has_parental_controls_state: %d", msg->response_msg.vehicleData.has_parental_controls_state);
+
+    switch (msg->which_response_msg)
+    {
+    case CarServer_Response_vehicleData_tag:
+        break;
+    case CarServer_Response_getSessionInfoResponse_tag:
+        ESP_LOGI(tag, "  getSessionInfoResponse:");
+        log_session_info(tag, &msg->response_msg.getSessionInfoResponse);
+        break;
+    case CarServer_Response_getNearbyChargingSites_tag:
+        ESP_LOGI(tag, "  getNearbyChargingSites:");
+        break;
+    case CarServer_Response_ping_tag:
+        ESP_LOGI(tag, "  ping:");
+        ESP_LOGI(tag, "    ping: %ld", msg->response_msg.ping.ping_id);
+        break;
+    default:
+        // do nothing
+        break;
+    }
+}
+
+
+
+================================================
+FILE: components/tesla_ble_vehicle/log.h
+================================================
+#pragma once
+
+#include <car_server.pb.h>
+#include <signatures.pb.h>
+#include <universal_message.pb.h>
+#include <vcsec.pb.h>
+
+// Main logging function for UniversalMessage_RoutableMessage
+// Helper functions for nested structures
+const char *domain_to_string(UniversalMessage_Domain domain);
+const char *information_request_type_to_string(VCSEC_InformationRequestType request_type);
+const char *message_fault_to_string(UniversalMessage_MessageFault_E fault);
+const char *operation_status_to_string(UniversalMessage_OperationStatus_E status);
+const char *vcsec_operation_status_to_string(VCSEC_OperationStatus_E status);
+const char *vssec_signed_message_information_to_string(VCSEC_SignedMessage_information_E information);
+const char *closure_state_to_string(VCSEC_ClosureState_E state);
+const char *vehicle_lock_state_to_string(VCSEC_VehicleLockState_E state);
+const char *vehicle_sleep_status_to_string(VCSEC_VehicleSleepStatus_E state);
+const char *user_presence_to_string(VCSEC_UserPresence_E state);
+const char *generic_error_to_string(Errors_GenericError_E error);
+const char *carserver_operation_status_to_string(CarServer_OperationStatus_E status);
+void log_aes_gcm_personalized_signature_data(const char *tag, const Signatures_AES_GCM_Personalized_Signature_Data *data);
+void log_destination(const char *tag, const char *prefix, const UniversalMessage_Destination *dest);
+void log_information_request(const char *tag, const VCSEC_InformationRequest *msg);
+void log_message_status(const char *tag, const UniversalMessage_MessageStatus *status);
+void log_routable_message(const char *tag, const UniversalMessage_RoutableMessage *msg);
+void log_session_info_request(const char *tag, const UniversalMessage_SessionInfoRequest *req);
+void log_session_info(const char *tag, const Signatures_SessionInfo *req);
+void log_signature_data(const char *tag, const Signatures_SignatureData *sig);
+void log_vehicle_status(const char *tag, const VCSEC_VehicleStatus *msg);
+void log_vssec_signed_message_status(const char *tag, const VCSEC_SignedMessage_status *status);
+void log_vssec_whitelist_operation_status(const char *tag, const VCSEC_WhitelistOperation_status *status);
+void log_vcsec_command_status(const char *tag, const VCSEC_CommandStatus *msg);
+void log_carserver_response(const char *tag, const CarServer_Response *msg);
+
+
+
+================================================
+FILE: components/tesla_ble_vehicle/tesla_ble_vehicle.h
+================================================
+#pragma once
+
+#include <algorithm>
+#include <cstring>
+#include <iterator>
+#include <vector>
+#include <queue>
+
+#include <esp_gattc_api.h>
+#include <esphome/components/binary_sensor/binary_sensor.h>
+#include <esphome/components/text_sensor/text_sensor.h>
+#include <esphome/components/sensor/sensor.h>
+#include <esphome/components/ble_client/ble_client.h>
+#include <esphome/components/esp32_ble_tracker/esp32_ble_tracker.h>
+#include <esphome/components/sensor/sensor.h>
+#include <esphome/core/component.h>
+#include <esphome/core/log.h>
+
+#include <universal_message.pb.h>
+#include <vcsec.pb.h>
+#include <errors.h>
+
+//#include "custom_binary_sensor.h"
+
+namespace TeslaBLE
+{
+    class Client;
+}
+
+typedef enum BLE_CarServer_VehicleAction_E
+{
+    DO_NOTHING, // Blank empty entry
+    GET_CHARGE_STATE,
+    GET_CLIMATE_STATE,
+    GET_DRIVE_STATE,
+    GET_LOCATION_STATE,
+    GET_CLOSURES_STATE,
+    SET_CHARGING_SWITCH,
+    SET_CHARGING_AMPS,
+    SET_CHARGING_LIMIT,
+    SET_SENTRY_SWITCH,
+    SET_HVAC_SWITCH,
+    SET_HVAC_STEERING_HEATER_SWITCH,
+    SET_OPEN_CHARGE_PORT_DOOR,
+    SET_CLOSE_CHARGE_PORT_DOOR,
+    SOUND_HORN,
+    FLASH_LIGHT,
+    SET_WINDOWS_SWITCH,
+    DEFROST_CAR
+} BLE_CarServer_VehicleAction;
+
+typedef enum // The type of messages to send
+{
+    VehicleActionMessage,
+    GetVehicleDataMessage,
+    Empty
+} AllowedMsg;
+
+typedef enum 
+/*
+*   The type of get to do immediately following a set (having this means a new set doesn't need a code change if it uses an existing
+*   getxxxstate call.
+*/
+{
+    GetChargeState,
+    GetClimateState,
+    GetDriveState,
+    GetLocationState,
+    GetClosureState,
+    Invalid // Eg a data read, sensor not yet implemented, etc
+} GetOnSet;
+
+struct ActionMessageDetail
+/*
+*   This defines the contents of the rows of the ACTION_SPECIFICS table below. For every localActionDef, this describes the specific
+*   contents for the message to send to the car. The rows of the table must be in the same order as BLE_CarServer_VehicleAction.
+*   If a new message is needed, simply add a row to the table with the appropriate contents, no need to edit the code in the .cpp.
+*/
+{
+    BLE_CarServer_VehicleAction_E localActionDef;
+    std::string action_str;
+    AllowedMsg whichMsg;
+    int actionTag;
+    GetOnSet getOnSet;
+};
+
+namespace esphome
+{
+
+    namespace tesla_ble_vehicle
+    {
+        namespace espbt = esphome::esp32_ble_tracker;
+
+        static const struct ActionMessageDetail ACTION_SPECIFICS[] =
+        {
+            {DO_NOTHING,                       "",                          Empty,                 0,                                                              Invalid},
+            {GET_CHARGE_STATE,                 "getChargeState",            GetVehicleDataMessage, CarServer_GetVehicleData_getChargeState_tag,                    Invalid},
+            {GET_CLIMATE_STATE,                "getClimateState",           GetVehicleDataMessage, CarServer_GetVehicleData_getClimateState_tag,                   Invalid},
+            {GET_DRIVE_STATE,                  "getDriveState",             GetVehicleDataMessage, CarServer_GetVehicleData_getDriveState_tag,                     Invalid},
+            {GET_LOCATION_STATE,               "getLocationState",          GetVehicleDataMessage, CarServer_GetVehicleData_getLocationState_tag,                  Invalid},
+            {GET_CLOSURES_STATE,               "getClosuresState",          GetVehicleDataMessage, CarServer_GetVehicleData_getClosuresState_tag,                  Invalid},
+            {SET_CHARGING_SWITCH,              "setChargingSwitch",         VehicleActionMessage,  CarServer_VehicleAction_chargingStartStopAction_tag,            GetChargeState},
+            {SET_CHARGING_AMPS,                "setChargingAmps",           VehicleActionMessage,  CarServer_VehicleAction_setChargingAmpsAction_tag,              GetChargeState},
+            {SET_CHARGING_LIMIT,               "setChargingLimit",          VehicleActionMessage,  CarServer_VehicleAction_chargingSetLimitAction_tag,             GetChargeState},
+            {SET_SENTRY_SWITCH,                "setSentrySwitch",           VehicleActionMessage,  CarServer_VehicleAction_vehicleControlSetSentryModeAction_tag,  Invalid},
+            {SET_HVAC_SWITCH,                  "setHVACSwitch",             VehicleActionMessage,  CarServer_VehicleAction_hvacAutoAction_tag,                     GetClimateState},
+            {SET_HVAC_STEERING_HEATER_SWITCH,  "setHVACSteeringHeatSwitch", VehicleActionMessage,  CarServer_VehicleAction_hvacSteeringWheelHeaterAction_tag,      Invalid},
+            {SET_OPEN_CHARGE_PORT_DOOR,        "setOpenChargePortDoor",     VehicleActionMessage,  CarServer_VehicleAction_chargePortDoorOpen_tag,                 Invalid},
+            {SET_CLOSE_CHARGE_PORT_DOOR,       "setCloseChargePortDoor",    VehicleActionMessage,  CarServer_VehicleAction_chargePortDoorClose_tag,                Invalid},
+            {SOUND_HORN,                       "soundHorn",                 VehicleActionMessage,  CarServer_VehicleAction_vehicleControlHonkHornAction_tag,       Invalid},
+            {FLASH_LIGHT,                      "flashLight",                VehicleActionMessage,  CarServer_VehicleAction_vehicleControlFlashLightsAction_tag,    Invalid},
+            {SET_WINDOWS_SWITCH,               "setWindowsSwitch",          VehicleActionMessage,  CarServer_VehicleAction_vehicleControlWindowAction_tag,         GetClosureState},
+            {DEFROST_CAR,                      "defrostCar",                VehicleActionMessage,  CarServer_VehicleAction_hvacSetPreconditioningMaxAction_tag,    GetClimateState}
+        };
+
+        static const char *const TAG = "tesla_ble_vehicle";
+        static const char *nvs_key_infotainment = "tk_infotainment";
+        static const char *nvs_key_vcsec = "tk_vcsec";
+
+        static const char *const SERVICE_UUID = "00000211-b2d1-43f0-9b88-960cebf8b91e";
+        static const char *const READ_UUID = "00000213-b2d1-43f0-9b88-960cebf8b91e";
+        static const char *const WRITE_UUID = "00000212-b2d1-43f0-9b88-960cebf8b91e";
+
+        static const int PRIVATE_KEY_SIZE = 228;
+        static const int PUBLIC_KEY_SIZE = 65;
+        static const int MAX_BLE_MESSAGE_SIZE = 1024; // Max size of a BLE message
+        static const int RX_TIMEOUT = 1 * 1000;       // Timeout interval between receiving chunks of a message (1s)
+        static const int MAX_LATENCY = 4 * 1000;      // Max allowed error when syncing vehicle clock (4s)
+        static const int BLOCK_LENGTH = 20;           // BLE MTU is 23 bytes, so we need to split the message into chunks (20 bytes as in vehicle_command)
+        static const int MAX_RETRIES = 5;             // Max number of retries for a command
+        static const int COMMAND_TIMEOUT = 30 * 1000; // Overall timeout for a command (30s)
+
+        enum class BLECommandState
+        {
+            IDLE,
+            WAITING_FOR_VCSEC_AUTH,
+            WAITING_FOR_VCSEC_AUTH_RESPONSE,
+            WAITING_FOR_INFOTAINMENT_AUTH,
+            WAITING_FOR_INFOTAINMENT_AUTH_RESPONSE,
+            WAITING_FOR_WAKE,
+            WAITING_FOR_WAKE_RESPONSE,
+            WAITING_FOR_LOCK_RESPONSE,
+            READY,
+            WAITING_FOR_RESPONSE,
+            WAITING_FOR_GET_POST_SET
+        };
+
+        struct BLECommand
+        {
+            UniversalMessage_Domain domain;
+            std::function<int()> execute;
+            std::string execute_name;
+            BLE_CarServer_VehicleAction action; // Only used for Infotainment domain to store the detailed request made
+            BLECommandState state;
+            uint32_t started_at = millis();
+            uint32_t last_tx_at = 0;
+            uint8_t retry_count = 0;
+            int done_times = 0; // Used to count if something has been done and how many times
+
+            BLECommand(UniversalMessage_Domain d, std::function<int()> e, std::string n = "", BLE_CarServer_VehicleAction a = DO_NOTHING)
+                : domain(d), execute(e), execute_name(n), action(a), state(BLECommandState::IDLE) {}
+        };
+
+        struct BLETXChunk
+        {
+            std::vector<unsigned char> data;
+            esp_gatt_write_type_t write_type;
+            esp_gatt_auth_req_t auth_req;
+            uint32_t sent_at = millis();
+            uint8_t retry_count = 0;
+
+            BLETXChunk(std::vector<unsigned char> d, esp_gatt_write_type_t wt, esp_gatt_auth_req_t ar)
+                : data(d), write_type(wt), auth_req(ar) {}
+        };
+
+        struct BLERXChunk
+        {
+            std::vector<unsigned char> buffer;
+            uint32_t received_at = millis();
+
+            BLERXChunk(std::vector<unsigned char> b)
+                : buffer(b) {}
+        };
+
+        struct BLEResponse
+        {
+            // universal message
+            UniversalMessage_RoutableMessage message;
+            uint32_t received_at = millis();
+
+            BLEResponse(UniversalMessage_RoutableMessage m)
+                : message(m) {}
+        };
+
+        class TeslaBLEVehicle : public PollingComponent,
+                                public ble_client::BLEClientNode
+        {
+        public:
+            int post_wake_poll_time_;
+            int poll_data_period_;
+            int poll_asleep_period_;
+            int poll_charging_period_;
+            int car_just_woken_ = 0;
+            bool previous_asleep_state_ = false;
+            bool one_off_update_ = false;
+            int car_wake_time_;
+            int last_infotainment_poll_time_;
+            int esp32_just_started_ = 0;
+            int car_is_charging_ = 0;
+            bool do_poll_ = false;
+            int ble_disconnected_ = 1; // 0 = connected, 1 = disconnected, 2 = disconnected and Unknowns have been set
+            int ble_disconnected_time_;
+            int ble_disconnected_min_time_;
+            int fast_poll_if_unlocked_ = 1; // != 0 enables fast polling
+            TeslaBLEVehicle();
+            void setup() override;
+            void loop() override;
+            void update() override;
+            void gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if,
+                                     esp_ble_gattc_cb_param_t *param) override;
+            void dump_config() override;
+            void set_vin(const char *vin);
+            void load_polling_parameters (const int post_wake_poll_time, const int poll_data_period,
+                                          const int poll_asleep_period, const int poll_charging_period,
+                                          const int ble_disconnected_min_time, const int fast_poll_if_unlocked,
+                                          const int wake_on_boot);
+            void process_command_queue();
+            void process_response_queue();
+            void process_ble_read_queue();
+            void process_ble_write_queue();
+            void invalidateSession(UniversalMessage_Domain domain);
+
+            void regenerateKey();
+            int startPair(void);
+            int nvs_save_session_info(const Signatures_SessionInfo &session_info, const UniversalMessage_Domain domain);
+            int nvs_load_session_info(Signatures_SessionInfo *session_info, const UniversalMessage_Domain domain);
+            int nvs_initialize_private_key();
+
+            int handleInfoCarServerResponse (CarServer_Response carserver_response);
+            int handleSessionInfoUpdate(UniversalMessage_RoutableMessage message, UniversalMessage_Domain domain);
+            int handleVCSECVehicleStatus(VCSEC_VehicleStatus vehicleStatus);
+
+            int wakeVehicle(void);
+            int lockVehicle (VCSEC_RKEAction_E lock);
+            void placeAtFrontOfQueue (UniversalMessage_Domain domain, std::function<int()> execute, std::string execute_name, BLE_CarServer_VehicleAction action = DO_NOTHING);
+    
+            int sendVCSECActionMessage(VCSEC_RKEAction_E action);
+            int sendVCSECClosureMoveRequestMessage (int moveWhat, VCSEC_ClosureMoveType_E moveType);
+            int sendCarServerVehicleActionMessage(BLE_CarServer_VehicleAction action, int param);
+            int sendSessionInfoRequest(UniversalMessage_Domain domain);
+            int sendVCSECInformationRequest(void);
+            void enqueueVCSECInformationRequest(bool force = false);
+            int wake_on_boot_ = 0; // != 0 wakes car on device boot
+
+            int writeBLE(const unsigned char *message_buffer, size_t message_length,
+                         esp_gatt_write_type_t write_type, esp_gatt_auth_req_t auth_req);
+
+            // sensors
+            // Sleep state (vehicleSleepStatus)
+            void set_binary_sensor_is_asleep(binary_sensor::BinarySensor *s) { isAsleepSensor = static_cast<binary_sensor::BinarySensor *>(s); }
+            void updateIsAsleep(bool asleep)
+            {
+                isAsleepSensor->publish_state(asleep);
+            }
+            // Door lock (vehicleLockState)
+            void set_binary_sensor_is_unlocked(binary_sensor::BinarySensor *s) { isUnlockedSensor = static_cast<binary_sensor::BinarySensor *>(s); }
+            void updateisUnlocked(bool locked)
+            {
+                isUnlockedSensor->publish_state(locked);
+            }
+            // User presence (userPresence)
+            void set_binary_sensor_is_user_present(binary_sensor::BinarySensor *s) { isUserPresentSensor = static_cast<binary_sensor::BinarySensor *>(s); }
+            void updateIsUserPresent(bool present)
+            {
+                isUserPresentSensor->publish_state(present);
+            }
+            // Charge flap (chargeFlapStatus)
+            void set_binary_sensor_is_charge_flap_open(binary_sensor::BinarySensor *s) { isChargeFlapOpenSensor = static_cast<binary_sensor::BinarySensor *>(s); }
+            void updateIsChargeFlapOpen(bool open)
+            {
+                isChargeFlapOpenSensor->publish_state(open);
+            }
+            void setChargeFlapHasState(bool has_state)
+            {
+                if (has_state)
+                {
+                    isChargeFlapOpenSensor->publish_state (has_state);
+                }
+                else
+                {
+                    isChargeFlapOpenSensor->invalidate_state ();
+                }
+            }
+
+            // set sensors to unknown (e.g. when vehicle is disconnected)
+            void setSensors(bool has_state) // has_state is an anachronism
+            {
+                isAsleepSensor->invalidate_state ();
+                isUnlockedSensor->invalidate_state ();
+                isUserPresentSensor->invalidate_state ();
+            }
+
+            void setInfotainmentSensors (bool state) // state is an anachronism
+            {
+                if (!state)
+                {
+                    ChargeStateSensor->publish_state (NAN);
+                    OdometerStateSensor->publish_state (NAN);
+                    ChargeCurrentStateSensor->publish_state (NAN);
+                    ChargeVoltageStateSensor->publish_state (NAN);
+                    ChargePowerStateSensor->publish_state (NAN);
+                    MaxSocStateSensor->publish_state (NAN);
+                    MaxAmpsStateSensor->publish_state (NAN);
+                    MinsToLimitStateSensor->publish_state (NAN);
+                    ShiftStateSensor->publish_state ("Unknown");
+                    DefrostStateSensor->publish_state ("Unknown");
+                    ChargingStateSensor->publish_state ("Unknown");
+                    BatteryRangeStateSensor->publish_state (NAN);
+                    isClimateOnSensor->invalidate_state ();
+                    insideTempStateSensor->publish_state (NAN);
+                    outsideTempStateSensor->publish_state (NAN);
+                    ChargeEnergyAddedSensor->publish_state (NAN);
+                    ChargeDistanceAddedSensor->publish_state (NAN);
+                    isBootOpenSensor->invalidate_state ();
+                    isFrunkOpenSensor->invalidate_state ();
+                    windowsStateSensor->invalidate_state ();
+                }
+
+            }
+            void setCarBatteryLevel (int battery_level)
+            {
+                ChargeStateSensor->publish_state (battery_level);
+            }
+            void setCarOdometer (int odometer)
+            {
+                OdometerStateSensor->publish_state (odometer);
+            }
+            void setChargeCurrent (int current)
+            {
+                ChargeCurrentStateSensor->publish_state (current);
+            }
+            void setChargeVoltage (int volts)
+            {
+                ChargeVoltageStateSensor->publish_state (volts);
+            }
+            void setChargePower (int power)
+            {
+                ChargePowerStateSensor->publish_state (power);
+            }
+            void setMaxSoc (int max)
+            {
+                MaxSocStateSensor->publish_state (max);
+            }
+            void setMaxAmps (int max)
+            {
+                MaxAmpsStateSensor->publish_state (max);
+            }
+            void setMinsToLimit (int limit)
+            {
+                MinsToLimitStateSensor->publish_state (limit);
+            }
+            void setBatteryRange (float range)
+            {
+                BatteryRangeStateSensor->publish_state (range);
+            }
+            void setCarShiftState (std::string shift_state)
+            {
+                ShiftStateSensor->publish_state (shift_state);
+            }
+            void setDefrostState (std::string defrost_state)
+            {
+                DefrostStateSensor->publish_state (defrost_state);
+            }
+            void setChargingState (std::string charging_state)
+            {
+                ChargingStateSensor->publish_state (charging_state);
+            }
+            void setLastUpdateState (std::string last_update)
+            {
+                LastUpdateStateSensor->publish_state (last_update);
+            }
+            void setClimateState (bool climate_state)
+            {
+                isClimateOnSensor->publish_state (climate_state);
+            }
+            void setBootState (bool boot_state)
+            {
+                isBootOpenSensor->publish_state (boot_state);
+            }
+            void setFrunkState (bool frunk_state)
+            {
+                isFrunkOpenSensor->publish_state (frunk_state);
+            }
+            void setWindowsState (bool windows_state)
+            {
+                windowsStateSensor->publish_state (windows_state);
+            }
+            void setInsideTemp (float temp)
+            {
+                insideTempStateSensor->publish_state (temp);
+            }
+            void setOutsideTemp (float temp)
+            {
+                outsideTempStateSensor->publish_state (temp);
+            }
+            void setChargeEnergyAdded (float energy)
+            {
+                ChargeEnergyAddedSensor->publish_state (energy);
+            }
+            void setChargeMilesAdded (float dist)
+            {
+                ChargeDistanceAddedSensor->publish_state (dist);
+            }
+
+            void set_text_sensor_shift_state (text_sensor::TextSensor *s)
+            {
+                ShiftStateSensor = static_cast<text_sensor::TextSensor *>(s);
+            }
+            void set_text_sensor_defrost_state (text_sensor::TextSensor *s)
+            {
+                DefrostStateSensor = static_cast<text_sensor::TextSensor *>(s);
+            }
+            void set_text_sensor_charging_state (text_sensor::TextSensor *s)
+            {
+                ChargingStateSensor = static_cast<text_sensor::TextSensor *>(s);
+            }
+            void set_text_sensor_last_update_state (text_sensor::TextSensor *s)
+            {
+                LastUpdateStateSensor = static_cast<text_sensor::TextSensor *>(s);
+            }
+            void set_sensor_charge_state (sensor::Sensor *s)
+            {
+                ChargeStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_charge_current_state (sensor::Sensor *s)
+            {
+                ChargeCurrentStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_charge_voltage_state (sensor::Sensor *s)
+            {
+                ChargeVoltageStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_charge_power_state (sensor::Sensor *s)
+            {
+                ChargePowerStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_max_soc_state (sensor::Sensor *s)
+            {
+                MaxSocStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_max_amps_state (sensor::Sensor *s)
+            {
+                MaxAmpsStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_mins_to_limit_state (sensor::Sensor *s)
+            {
+                MinsToLimitStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_battery_range_state (sensor::Sensor *s)
+            {
+                BatteryRangeStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_odometer_state (sensor::Sensor *s)
+            {
+                OdometerStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_charge_energy_added_state (sensor::Sensor *s)
+            {
+                ChargeEnergyAddedSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_charge_distance_added_state (sensor::Sensor *s)
+            {
+                ChargeDistanceAddedSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_binary_sensor_is_climate_on (binary_sensor::BinarySensor *s)
+            {
+                isClimateOnSensor = static_cast<binary_sensor::BinarySensor *>(s);
+            }
+            void set_binary_sensor_is_boot_open (binary_sensor::BinarySensor *s)
+            {
+                isBootOpenSensor = static_cast<binary_sensor::BinarySensor *>(s);
+            }
+            void set_binary_sensor_is_frunk_open (binary_sensor::BinarySensor *s)
+            {
+                isFrunkOpenSensor = static_cast<binary_sensor::BinarySensor *>(s);
+            }
+            void set_binary_sensor_windows_state (binary_sensor::BinarySensor *s)
+            {
+                windowsStateSensor = static_cast<binary_sensor::BinarySensor *>(s);
+            }
+            void set_sensor_internal_temp_state (sensor::Sensor *s)
+            {
+                insideTempStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+            void set_sensor_external_temp_state (sensor::Sensor *s)
+            {
+                outsideTempStateSensor = static_cast<sensor::Sensor *>(s);
+            }
+
+            std::string lookup_shift_state (int shift_state)
+            {
+                switch (shift_state)
+                {
+                    case CarServer_ShiftState_Invalid_tag:  return ("Invalid");
+                    case CarServer_ShiftState_P_tag:        return ("P");
+                    case CarServer_ShiftState_R_tag:        return ("R");
+                    case CarServer_ShiftState_N_tag:        return ("N");
+                    case CarServer_ShiftState_D_tag:        return ("D");
+                    case CarServer_ShiftState_SNA_tag:      return ("SNA");
+                }
+                return ("Shift state look up error");
+            }
+            std::string lookup_defrost_state (int defrost_state)
+            {
+                switch (defrost_state)
+                {
+                    case CarServer_ClimateState_DefrostMode_Off_tag:       return ("Off");
+                    case CarServer_ClimateState_DefrostMode_Normal_tag:    return ("Normal");
+                    case CarServer_ClimateState_DefrostMode_Max_tag:       return ("Max");
+                }
+                return ("Shift state look up error");
+            }
+            std::string lookup_charging_state (int charging_state)
+            {
+                switch (charging_state)
+                {
+                    case CarServer_ChargeState_ChargingState_Unknown_tag:       return ("Unknown");
+                    case CarServer_ChargeState_ChargingState_Disconnected_tag:  return ("Disconnected");
+                    case CarServer_ChargeState_ChargingState_NoPower_tag:       return ("No Power");
+                    case CarServer_ChargeState_ChargingState_Starting_tag:      return ("Starting");
+                    case CarServer_ChargeState_ChargingState_Charging_tag:      return ("Charging");
+                    case CarServer_ChargeState_ChargingState_Complete_tag:      return ("Complete");
+                    case CarServer_ChargeState_ChargingState_Stopped_tag:       return ("Stopped");
+                    case CarServer_ChargeState_ChargingState_Calibrating_tag:   return ("Calibrating");
+                }
+                return ("Charging state look up error");
+            }
+
+        protected:
+            std::queue<BLERXChunk> ble_read_queue_;
+            std::queue<BLEResponse> response_queue_;
+            std::queue<BLETXChunk> ble_write_queue_;
+            std::queue<BLECommand> command_queue_;
+
+            TeslaBLE::Client *tesla_ble_client_;
+            uint32_t storage_handle_;
+            uint16_t handle_;
+            uint16_t read_handle_{0};
+            uint16_t write_handle_{0};
+
+            espbt::ESPBTUUID service_uuid_;
+            espbt::ESPBTUUID read_uuid_;
+            espbt::ESPBTUUID write_uuid_;
+
+            // sensors
+            binary_sensor::BinarySensor *isAsleepSensor;
+            binary_sensor::BinarySensor *isUnlockedSensor;
+            binary_sensor::BinarySensor *isUserPresentSensor;
+            binary_sensor::BinarySensor *isChargeFlapOpenSensor;
+            binary_sensor::BinarySensor *isClimateOnSensor;
+            binary_sensor::BinarySensor *isBootOpenSensor;
+            binary_sensor::BinarySensor *isFrunkOpenSensor;
+            binary_sensor::BinarySensor *windowsStateSensor;
+            text_sensor::TextSensor *ShiftStateSensor;
+            text_sensor::TextSensor *DefrostStateSensor;
+            text_sensor::TextSensor *ChargingStateSensor;
+            text_sensor::TextSensor *LastUpdateStateSensor;
+            sensor::Sensor *ChargeStateSensor;
+            sensor::Sensor *OdometerStateSensor;
+            sensor::Sensor *ChargeCurrentStateSensor;
+            sensor::Sensor *ChargeVoltageStateSensor;
+            sensor::Sensor *ChargePowerStateSensor;
+            sensor::Sensor *MaxSocStateSensor;
+            sensor::Sensor *MaxAmpsStateSensor;
+            sensor::Sensor *MinsToLimitStateSensor;
+            sensor::Sensor *BatteryRangeStateSensor;
+            sensor::Sensor *outsideTempStateSensor;
+            sensor::Sensor *insideTempStateSensor;
+            sensor::Sensor *ChargeEnergyAddedSensor;
+            sensor::Sensor *ChargeDistanceAddedSensor;
+
+            std::vector<unsigned char> ble_read_buffer_;
+
+            void initializeFlash();
+            void openNVSHandle();
+            void initializePrivateKey();
+            void loadSessionInfo();
+            void loadDomainSessionInfo(UniversalMessage_Domain domain);
+        };
+
+    } // namespace tesla_ble_vehicle
+} // namespace esphome
+
+
+
+================================================
+FILE: packages/base.yml
+================================================
+substitutions:
+  device_description: Interact with Tesla vehicles over BLE using ESPHome and Home Assistant
+  board: "esp32dev"   # defaults
+  variant: "ESP32"
+  flash_size: "4MB"
+  BLE_library: "https://github.com/PedroKTFC/tesla-ble.git"
+  tesla_ble_component: "github://PedroKTFC/esphome-tesla-ble"
+  ble_presence_timeout: 5s
+
+esphome:
+  project:
+    name: PedroKTFC.esphome-tesla-ble
+    version: "2025.12.2"
+  name: ${device_name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+  libraries:
+    - TeslaBLE=${BLE_library}
+
+esp32:
+  board: $board
+  variant: $variant
+  flash_size: $flash_size
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: $tesla_ble_component
+    components: [tesla_ble_vehicle, tesla_ble_listener]
+
+logger:
+  level: INFO
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    password: !secret wifi_hotspot_password
+
+
+
+================================================
+FILE: packages/board.yml
+================================================
+substitutions:
+  espidf_version: "5.3.1"
+  platformio_version: "6.9.0"
+
+esp32:
+  board: $board
+  variant: $variant
+  flash_size: $flash_size
+  framework:
+    type: esp-idf
+    version: $espidf_version
+    platform_version: $platformio_version
+
+
+
+================================================
+FILE: packages/client.yml
+================================================
+substitutions:
+  ble_mac_address: !secret ble_mac_address
+  tesla_vin: !secret tesla_vin
+  charging_amps_max: "32"
+
+ble_client:
+  - mac_address: $ble_mac_address
+    id: ble_tesla_id
+
+tesla_ble_vehicle:
+  ble_client_id: ble_tesla_id
+  id: tesla_ble_vehicle_id
+  vin: $tesla_vin
+  update_interval: 10s # default
+  post_wake_poll_time: 300 # How long to poll for data after car awakes (s)
+  poll_data_period: 60 # Normal period when polling for data when not asleep (s)
+  poll_asleep_period: 60 # Period to poll for data when asleep (s)
+  poll_charging_period: 10 # Period to poll for data when charging (s)
+  ble_disconnected_min_time: 300 # Minimum time BLE must be disconnected before sensors are Unknwon (s)
+  fast_poll_if_unlocked: 0 # if != 0, fast polls are enabled when unlocked
+  wake_on_boot: 0 # != 0 wakes car on device boot
+
+  is_asleep:
+    name: "Asleep"
+  is_user_present:
+    name: "User presence"
+  is_unlocked:
+    id: "is_unlocked"
+    name: "Doors"
+  is_charge_flap_open:
+    id: "is_charge_flap_open"
+    name: "Charge flap"
+  is_boot_open:
+    id: "is_boot_open"
+    name: "Boot"
+  is_frunk_open:
+    id: "is_frunk_open"
+    name: "Frunk"
+  shift_state:
+    name: "Shift state"
+  defrost_state:
+    id: "defrost_state"
+    name: "Defrost state"
+  charge_state:
+    id: "charge_state"
+    name: "Charge level"
+  odometer:
+    name: "Odometer"
+    filters:
+      - multiply: 0.01 # Odometer is in hundredths of a mile (can use this to convert to km)
+  charge_current:
+    id: "charge_current"
+    name: "Charge current"
+  charge_voltage:
+    id: "charge_voltage"
+    name: "Charge voltage"  
+  charge_power:
+    id: "charge_power"
+    name: "Charge power"
+  charge_energy_added:
+    id: "charge_energy_added"
+    name: "Charge energy added"
+  charge_distance_added:
+    id: "charge_distance_added"
+    name: "Charge distance added"
+  max_soc:
+    id: "max_soc"
+    name: "Charge limit"
+  max_amps:
+    id: "max_amps"
+    name: "Current limit"
+  mins_to_limit:
+    id: "mins_to_limit"
+    name: "Minutes to limit"
+  battery_range:
+    name: "Range"
+  charging_state:
+    id: "charging_state"
+    name: "Charging state"
+  last_update:
+    name: "Last update"
+  is_climate_on:
+    id: "is_climate_on"
+    name: "Climate"
+  internal_temp:
+    name: "Interior"
+  external_temp:
+    name: "Exterior"
+  windows_state:
+    id: "windows_state"
+    name: "Windows"
+      
+button:
+  - platform: template
+    id: ble_pair
+    name: Pair BLE key
+    icon: mdi:key-wireless
+    on_press:
+      - lambda: id(tesla_ble_vehicle_id)->startPair();
+    entity_category: diagnostic
+
+  - platform: template
+    id: btn_wake_up
+    name: Wake up
+    icon: mdi:sleep-off
+    on_press:
+    - lambda: id(tesla_ble_vehicle_id)->wakeVehicle();
+
+  - platform: template
+    id: btn_flash_light
+    name: Flash light
+    icon: mdi:car-light-high
+    on_press:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage (FLASH_LIGHT, 0);
+
+  - platform: template
+    id: btn_sound_horn
+    name: Sound horn
+    icon: mdi:bugle
+    on_press:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage (SOUND_HORN, 0);
+
+  - platform: template
+    id: btn_unlock_charge_port
+    name: Unlock charge port
+    icon: mdi:ev-plug-ccs2
+    on_press:
+      - lambda: id(tesla_ble_vehicle_id)->sendVCSECClosureMoveRequestMessage (VCSEC_ClosureMoveRequest_chargePort_tag, VCSEC_ClosureMoveType_E_CLOSURE_MOVE_TYPE_OPEN);
+
+  - platform: template
+    id: btn_unlatch_driver_door
+    name: Unlatch driver door
+    icon: mdi:car-door
+    on_press:
+      - lambda: id(tesla_ble_vehicle_id)->sendVCSECClosureMoveRequestMessage (VCSEC_ClosureMoveRequest_frontDriverDoor_tag, VCSEC_ClosureMoveType_E_CLOSURE_MOVE_TYPE_OPEN);
+    disabled_by_default: true
+
+  - platform: template
+    id: btn_regenerate_key
+    name: Regenerate key
+    icon: mdi:key-change
+    on_press:
+      - lambda: id(tesla_ble_vehicle_id)->regenerateKey();
+    entity_category: diagnostic
+    disabled_by_default: true
+
+  - platform: template
+    id: btn_force_data_update
+    name: Force data update
+    icon: mdi:database-sync
+    on_press:
+      - lambda: id(tesla_ble_vehicle_id)->enqueueVCSECInformationRequest(true);
+    entity_category: diagnostic
+
+sensor:
+  - platform: ble_client
+    type: rssi
+    id: ble_signal
+    ble_client_id: ble_tesla_id
+    name: "BLE Signal"
+    icon: mdi:bluetooth
+    update_interval: 60s
+    entity_category: diagnostic
+
+switch:
+  - platform: template
+    id: sw_charger
+    name: "Charger"
+    optimistic: true
+    icon: mdi:lightning-bolt
+#    restore_mode: RESTORE_DEFAULT_OFF
+    lambda: |-
+      if ((id(charging_state).state == "Charging") or (id(charging_state).state == "Starting") or (id(charging_state).state == "Calibrating")) {
+        return true;
+      } else {
+        return false;
+      }
+    turn_on_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_CHARGING_SWITCH, 1);
+    turn_off_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_CHARGING_SWITCH, 0);
+
+  - platform: template
+    id: sw_sentry_mode
+    name: "Sentry mode"
+    optimistic: true
+    icon: mdi:record-circle-outline
+    assumed_state: true # we can't read the state 
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_SENTRY_SWITCH, 1);
+    turn_off_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_SENTRY_SWITCH, 0);
+  
+  - platform: template
+    id: sw_climate
+    name: "Climate"
+    optimistic: true
+    icon: mdi:fan
+    lambda: |-
+      if (id(is_climate_on).state) {
+        return true;
+      } else {
+        return false;
+      }
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_HVAC_SWITCH, 1);
+    turn_off_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_HVAC_SWITCH, 0);
+
+  - platform: template
+    id: sw_steering_wheel_heat
+    name: "Steering wheel heat"
+    optimistic: true
+    icon: mdi:steering
+    assumed_state: true # we can't read the state 
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_HVAC_STEERING_HEATER_SWITCH, 1);
+    turn_off_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_HVAC_STEERING_HEATER_SWITCH, 0);
+  
+  - platform: template
+    id: sw_defrost_car
+    name: Defrost car
+    optimistic: true
+    icon: mdi:snowflake-melt
+    lambda: |-
+      if (id(defrost_state).state != "Off") {
+        return true;
+      } else {
+        return false;
+      }
+    turn_on_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage (DEFROST_CAR, 1);
+    turn_off_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage (DEFROST_CAR, 0);
+
+  - platform: template
+    id: fast_poll_if_unlocked
+    name: "Fast poll if unlocked"
+    optimistic: true
+    icon: mdi:car-door-lock-open
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_OFF
+    disabled_by_default: true
+    on_state:
+      - if:
+          condition:
+            lambda: 'return x;'
+          then:
+            - lambda: id(tesla_ble_vehicle_id)->fast_poll_if_unlocked_ = 1;
+          else:
+            - lambda: id(tesla_ble_vehicle_id)->fast_poll_if_unlocked_ = 0;
+
+  - platform: template
+    id: wake_on_boot
+    name: "Wake on boot"
+    optimistic: true
+    icon: mdi:sleep-off
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_OFF
+    disabled_by_default: true
+    on_state:
+      - if:
+          condition:
+            lambda: 'return x;'
+          then:
+            - lambda: id(tesla_ble_vehicle_id)->wake_on_boot_ = 1;
+          else:
+            - lambda: id(tesla_ble_vehicle_id)->wake_on_boot_ = 0;
+  
+
+
+  - platform: ble_client
+    id: sw_ble_connection
+    ble_client_id: ble_tesla_id
+    name: "BLE Connection"
+    entity_category: diagnostic
+
+lock:
+  - platform: template
+    id: lock_car
+    name: "Lock car"
+    optimistic: true
+    icon: mdi:lock
+    lambda: |-
+      if (id(is_unlocked).state) {
+          return LOCK_STATE_UNLOCKED;
+        } else {
+          return LOCK_STATE_LOCKED;
+        }
+    unlock_action:
+      - lambda: |-
+          id(tesla_ble_vehicle_id)->lockVehicle(VCSEC_RKEAction_E_RKE_ACTION_UNLOCK);
+    lock_action:
+      - lambda: |-
+          id(tesla_ble_vehicle_id)->lockVehicle(VCSEC_RKEAction_E_RKE_ACTION_LOCK);
+
+cover:
+  - platform: template
+    id: cov_vent
+    name: "Vent"
+    optimistic: false #### true
+    icon: mdi:car-door
+    device_class: door
+    lambda: |-
+      if (id(windows_state).state) {
+        return COVER_OPEN;
+      } else {
+        return COVER_CLOSED;
+      }
+    close_action: #### This way round to make the arrows follow the desired window motion
+      - lambda: |-
+          id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage (SET_WINDOWS_SWITCH, 0);
+    open_action:
+      - lambda: |-
+          id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage (SET_WINDOWS_SWITCH, 1);
+
+  - platform: template
+    id: cov_charge_port
+    name: "Charge port"
+    optimistic: true
+    device_class: door
+    icon: mdi:ev-plug-ccs2
+    lambda: |-
+      if (id(is_charge_flap_open).state) {
+        return COVER_OPEN;
+      } else {
+        return COVER_CLOSED;
+      }
+#    restore_mode: RESTORE_DEFAULT_OFF
+    open_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_OPEN_CHARGE_PORT_DOOR,1);
+    close_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_CLOSE_CHARGE_PORT_DOOR,1);
+  
+  - platform: template
+    id: cov_boot
+    name: "Boot"
+    optimistic: true
+    device_class: door
+    icon: mdi:car-back
+    lambda: |-
+      if (id(is_boot_open).state) {
+        return COVER_OPEN;
+      } else {
+        return COVER_CLOSED;
+      }
+#    restore_mode: RESTORE_DEFAULT_OFF
+    open_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendVCSECClosureMoveRequestMessage (VCSEC_ClosureMoveRequest_rearTrunk_tag, VCSEC_ClosureMoveType_E_CLOSURE_MOVE_TYPE_OPEN);
+    close_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendVCSECClosureMoveRequestMessage (VCSEC_ClosureMoveRequest_rearTrunk_tag, VCSEC_ClosureMoveType_E_CLOSURE_MOVE_TYPE_CLOSE);
+
+  - platform: template
+    id: cov_frunk
+    name: "Frunk"
+    optimistic: true
+    device_class: door
+    icon: mdi:car
+#    assumed_state: true # we can't read the state 
+    lambda: |-
+      if (id(is_frunk_open).state) {
+        return COVER_OPEN;
+      } else {
+        return COVER_CLOSED;
+      }
+    open_action:
+      - lambda: id(tesla_ble_vehicle_id)->sendVCSECClosureMoveRequestMessage (VCSEC_ClosureMoveRequest_frontTrunk_tag, VCSEC_ClosureMoveType_E_CLOSURE_MOVE_TYPE_OPEN);
+    
+number:
+  - platform: template
+    name: "Charging amps"
+    id: charging_amps
+    icon: mdi:ev-station
+    unit_of_measurement: "A"
+    mode: slider
+    update_interval: 2s
+    min_value: 0
+    max_value: $charging_amps_max
+    step: 1
+    set_action:
+      - lambda: |-
+          int var_x = static_cast<int>(x);
+          id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_CHARGING_AMPS, var_x);
+    lambda: |-
+      if (id(max_amps).has_state())
+      {
+        return id(max_amps).state;
+      }
+      else return (0);
+  - platform: template
+    name: "Charging limit"
+    id: charging_limit
+    icon: mdi:ev-station
+    unit_of_measurement: "%"
+    mode: slider
+    update_interval: 2s
+    min_value: 50
+    max_value: 100
+    step: 1
+    set_action:
+      - lambda: |-
+          int var_x = static_cast<int>(x);
+          id(tesla_ble_vehicle_id)->sendCarServerVehicleActionMessage(SET_CHARGING_LIMIT, var_x);
+    lambda: |-
+      if (id(max_soc).has_state())
+      {
+        return id(max_soc).state;
+      }
+      else return (0);
+
+  - platform: template
+    id: post_wake_poll_time
+    name: "Post wake poll time"
+    icon: mdi:timelapse
+    min_value: 0
+    max_value: 1000
+    mode: box
+    step: 1
+    restore_value: true
+    initial_value: 300
+    optimistic: true
+    disabled_by_default: true
+    entity_category: config
+    on_value:
+      - lambda: |-
+          id(tesla_ble_vehicle_id)->post_wake_poll_time_ = x * 1000;
+  - platform: template
+    id: poll_data_period
+    name: "Poll data period"
+    icon: mdi:timer-outline
+    min_value: 0
+    max_value: 1000
+    mode: box
+    step: 1
+    restore_value: true
+    initial_value: 60
+    optimistic: true
+    disabled_by_default: true
+    entity_category: config
+    on_value:
+      - lambda: |-
+          id(tesla_ble_vehicle_id)->poll_data_period_ = x * 1000;
+  - platform: template
+    id: poll_asleep_period
+    name: "Poll asleep period"
+    icon: mdi:bed-clock
+    min_value: 0
+    max_value: 1000
+    mode: box
+    step: 1
+    restore_value: true
+    initial_value: 60
+    optimistic: true
+    disabled_by_default: true
+    entity_category: config
+    on_value:
+      - lambda: |-
+          id(tesla_ble_vehicle_id)->poll_asleep_period_ = x * 1000;
+  - platform: template
+    id: poll_charging_period
+    name: "Poll charging period"
+    icon: mdi:timer-sync-outline
+    min_value: 0
+    max_value: 1000
+    mode: box
+    step: 1
+    restore_value: true
+    initial_value: 10
+    optimistic: true
+    disabled_by_default: true
+    entity_category: config
+    on_value:
+      - lambda: |-
+          id(tesla_ble_vehicle_id)->poll_charging_period_ = x * 1000;
+  - platform: template
+    id: ble_disconnected_min_time
+    name: "BLE disconnected min time"
+    icon: mdi:bluetooth-connect
+    min_value: 0
+    max_value: 1000
+    mode: box
+    step: 1
+    restore_value: true
+    initial_value: 300
+    optimistic: true
+    disabled_by_default: true
+    entity_category: config
+    on_value:
+      - lambda: |-
+          id(tesla_ble_vehicle_id)->ble_disconnected_min_time_ = x * 1000;
+
+
+
+================================================
+FILE: packages/common.yml
+================================================
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    icon: mdi:wifi
+
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+    icon: mdi:clock-outline
+
+binary_sensor:
+  - platform: status
+    name: "Status"
+  - platform: ble_presence
+    mac_address: $ble_mac_address
+    device_class: connectivity
+    name: "BLE Status"
+    entity_category: diagnostic
+    timeout: $ble_presence_timeout
+
+text_sensor:
+  - platform: version
+    name: "Version"
+    icon: mdi:cube-outline
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+button:
+  - platform: restart
+    name: Restart
+    icon: mdi:restart
+    entity_category: diagnostic
+
+
+
+================================================
+FILE: packages/external_components.dashboard.yml
+================================================
+- components: [tesla_ble_vehicle, tesla_ble_listener]
+  source: github://PedroKTFC/esphome-tesla-ble
+
+
+
+================================================
+FILE: packages/external_components.yml
+================================================
+- components: [tesla_ble_vehicle, tesla_ble_listener]
+  source: components
+
+
+
+================================================
+FILE: packages/language_de.yml
+================================================
+# including this file will regionalize the entities to German:
+# - localize all names to German terminology
+# - use km. instead of mi for distance units by default
+
+
+tesla_ble_vehicle:
+  is_asleep:
+    name: "Im Ruhezustand"
+  is_user_present:
+    name: "Person erkannt"
+  is_unlocked:
+    name: "Entriegelt"
+  is_charge_flap_open:
+    icon: mdi:ev-plug-ccs2
+    name: "Ladeanschluss"
+  is_boot_open:
+    name: "Kofferraum hinten"
+  is_frunk_open:
+    name: "Kofferraum vorne"
+  shift_state:
+    name: "Schaltstellung"
+  defrost_state:
+    name: "Enteisung"
+  charge_state:
+    name: "Ladezustand"
+  odometer:
+    name: "Kilometerstand"
+    filters:
+      - multiply: 1.609344
+    unit_of_measurement: km
+  charge_current:
+    name: "Ladestrom"
+  charge_voltage:
+    name: "Ladespannung"
+  charge_power:
+    name: "Ladeleistung"
+  charge_energy_added:
+    name: "Bezogene Energie"
+  charge_distance_added:
+    name: "Reichweitenzuwachs"
+    filters:
+      - multiply: 1.609344
+    unit_of_measurement: km
+  max_soc:
+    name: "Ladelimit"
+  max_amps:
+    name: "Strombegrenzung"
+  mins_to_limit:
+    name: "Zeit bis Ladeende"
+  battery_range:
+    name: "Reichweite"
+    filters:
+      - multiply: 1.609344
+    unit_of_measurement: km
+  charging_state:
+    name: "Ladezustand"
+  last_update:
+    name: "Zuletzt aktualisiert"
+  is_climate_on:
+    name: "Klimaanlage"
+  internal_temp:
+    name: "Innenraumtemperatur"
+  external_temp:
+    name: "Außentemperatur"
+  windows_state:
+    name: "Fenster"
+button:
+  - id: !extend ble_pair
+    name: "BLE-Schlüsselpaarung"
+  - id: !extend btn_wake_up
+    name: "Aufwecken"
+  - id: !extend btn_flash_light
+    name: "Lichthupe"
+  - id: !extend btn_sound_horn
+    name: "Hupen"
+  - id: !extend btn_unlock_charge_port
+    name: "Ladeanschluss entriegeln"
+  - id: !extend btn_unlatch_driver_door
+    name: "Fahrertür öffnen"
+  - id: !extend btn_regenerate_key
+    name: "Schlüssel neu generieren"
+  - id: !extend btn_force_data_update
+    name: "Manuelle Datenaktualisierung"
+sensor:
+  - id: !extend ble_signal
+    name: "BLE-Signalstärke"
+switch:
+  - id: !extend sw_charger
+    name: "Laden"
+  - id: !extend sw_sentry_mode
+    name: "Wächtermodus"
+  - id: !extend sw_climate
+    name: "Klimaanlage"
+  - id: !extend sw_steering_wheel_heat
+    name: "Lenkradheizung"
+  - id: !extend sw_defrost_car
+    name: "Enteisung"
+  - id: !extend sw_ble_connection
+    name: "BLE-Verbindung"
+  - id: !extend fast_poll_if_unlocked
+    name: "Schnelle Abfrage bei entriegelt"
+lock:
+  - id: !extend lock_car
+    name: "Auto verriegeln"
+cover:
+  - id: !extend cov_vent
+    name: "Belüftung"
+  - id: !extend cov_charge_port
+    name: "Ladeanschluss"
+  - id: !extend cov_boot
+    name: "Kofferraum hinten"
+  - id: !extend cov_frunk
+    name: "Kofferraum vorne"
+number:
+  - id: !extend charging_amps
+    name: "Ladestrom"
+  - id: !extend charging_limit
+    name: "Ladelimit"
+  - id: !extend post_wake_poll_time
+    name: "Abfrageintervall nach Aufwecken"
+  - id: !extend poll_data_period
+    name: "Standard-Abfrageintervall"
+  - id: !extend poll_asleep_period
+    name: "Abfrageintervall im Ruhezustand"
+  - id: !extend poll_charging_period
+    name: "Abfrageintervall beim Laden"
+  - id: !extend ble_disconnected_min_time
+
+    name: "Min. Zeit für BLE-Trennung"
+
+
+
+
+
+================================================
+FILE: packages/language_hu.yml
+================================================
+# including this file will regionalize the entities to Hungarian:
+# - localize all names to Hungarian terminology
+# - use km. instead of mi for distance units by default
+
+tesla_ble_vehicle:
+  is_asleep:
+    name: "Alvó állapotban"
+  is_user_present:
+    name: "Személy észlelve"
+  is_unlocked:
+    name: "Nyitva van"
+  is_charge_flap_open:
+    icon: mdi:ev-plug-ccs2
+    name: "Töltőnyílás"
+  is_boot_open:
+    name: "Csomagtartó hátsó"
+  is_frunk_open:
+    name: "Csomagtartó első"
+  shift_state:
+    name: "Váltó pozíció"
+  defrost_state:
+    name: "Fagymentesítés"
+  charge_state:
+    name: "Töltöttségi szint"
+  odometer:
+    name: "Km. óra állás"
+    filters:
+      - multiply: 1.609344 # in hundredths of a mile but, multiply by 0.01 alredy in package file
+    unit_of_measurement: km
+  charge_current:
+    name: "Töltési áram"
+  charge_voltage:
+    name: "Töltési feszültség"  
+  charge_power:
+    name: "Töltési teljesítmény"
+  charge_energy_added:
+    name: "Vételezett energia"
+  charge_distance_added:
+    name: "Hatótáv növekedés"
+    filters:
+      - multiply: 1.609344 # miles
+    unit_of_measurement: km
+  max_soc:
+    name: "Töltési limit"
+  max_amps:
+    name: "Töltési áram limit"
+  mins_to_limit:
+    name: "Idő a töltés befejezéséig"
+  battery_range:
+    name: "Hatótáv"
+    filters:
+      - multiply: 1.609344 # miles
+    unit_of_measurement: km
+  charging_state:
+    name: "Töltési állapot"
+  last_update:
+    name: "Utoljára frissült"
+  is_climate_on:
+    name: "Klíma"
+  internal_temp:
+    name: "Hőmérséklet bent"
+  external_temp:
+    name: "Hőmérséklet kint"
+  windows_state:
+    name: "Ablakok"
+
+button:
+  - id: !extend ble_pair
+    name: "BLE kulcspárosítás"
+  - id: !extend btn_wake_up
+    name: "Felébresztés"
+  - id: !extend btn_flash_light
+    name: "Fénykürt"
+  - id: !extend btn_sound_horn
+    name: "Dudaszó"
+  - id: !extend btn_unlock_charge_port
+    name: "Töltőnyílás feloldása"
+  - id: !extend btn_unlatch_driver_door
+    name: "Vezetőajtó kinyitás"
+  - id: !extend btn_regenerate_key
+    name: "Kulcs újragenerálása"
+  - id: !extend btn_force_data_update
+    name: "Kézi adatfrissítés"
+
+sensor:
+  - id: !extend ble_signal
+    name: "BLE jelszint"
+
+switch:
+  - id: !extend sw_charger
+    name: "Töltés"
+  - id: !extend sw_sentry_mode
+    name: "Őrszem"
+  - id: !extend sw_climate
+    name: "Klíma"
+  - id: !extend sw_steering_wheel_heat
+    name: "Kormányfűtés"
+  - id: !extend sw_defrost_car
+    name: "Fagymentesítés"
+  - id: !extend sw_ble_connection
+    name: "BLE kapcsolat"
+  - id: !extend fast_poll_if_unlocked
+    name: "Lekérdezés gyors nyitott zárnál"
+
+lock:
+  - id: !extend lock_car
+    name: "Autó zár"
+
+cover:
+  - id: !extend cov_vent
+    name: "Szellőztetés"
+  - id: !extend cov_charge_port
+    name: "Töltőnyílás"
+  - id: !extend cov_boot
+    name: "Csomagtartó hátsó"
+  - id: !extend cov_frunk
+    name: "Csomagtartó első"
+    
+number:
+  - id: !extend charging_amps
+    name: "Töltési áram"
+  - id: !extend charging_limit
+    name: "Töltési limit"
+  - id: !extend post_wake_poll_time
+    name: "Lekérdezés gyak. felébresztés után"
+  - id: !extend poll_data_period
+    name: "Lekérdezés gyak. alapértelmezett"
+  - id: !extend poll_asleep_period
+    name: "Lekérdezés gyak. alvó állapotban"
+  - id: !extend poll_charging_period
+    name: "Lekérdezés gyak. töltés közben"
+  - id: !extend ble_disconnected_min_time
+    name: "BLE lecsatlakozott állapot min idő"
+
+
+
+================================================
+FILE: packages/listener.yml
+================================================
+substitutions:
+  tesla_vin: !secret tesla_vin
+
+# Enable this to scan for BLE devices
+tesla_ble_listener:
+  vin: $tesla_vin
+
+
+
+================================================
+FILE: packages/project.yml
+================================================
+esp32_ble_tracker:
+  scan_parameters:
+    # Depending on the model and state, BLE advertisements come every 20ms or every 150ms.
+    interval: 150ms
+    # Activate scan only after wifi connect, see https://github.com/esphome/issues/issues/2941#issuecomment-1842369092
+    continuous: false
+
+wifi:
+  # Activate scan only after wifi connect, see https://github.com/esphome/issues/issues/2941#issuecomment-1842369092
+  on_connect:
+    - esp32_ble_tracker.start_scan:
+        continuous: true
+  on_disconnect:
+    - esp32_ble_tracker.stop_scan:
+
+
+
+================================================
+FILE: static/_config.yml
+================================================
+title: ESPHome Tesla BLE
+description: ESPHome Tesla BLE
+theme: jekyll-theme-hacker
+
+
+
+================================================
+FILE: static/index.md
+================================================
+# About
+
+ESPHome Tesla BLE
+
+# Installation
+
+You can use the button below to install the pre-built firmware directly to your device via USB from the browser.
+
+<esp-web-install-button manifest="./manifest.json"></esp-web-install-button>
+
+<script type="module" src="https://unpkg.com/esp-web-tools@9/dist/web/install-button.js?module"></script>
+
+
+
+================================================
+FILE: .github/dependabot.yml
+================================================
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+
+version: 2
+updates:
+  - package-ecosystem: "pip" # See documentation for possible values
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: "weekly"
+
+
+
+================================================
+FILE: .github/FUNDING.yml
+================================================
+ko_fi: pedroktfc
+
+
+
+================================================
+FILE: .github/workflows/ci.yml
+================================================
+name: CI
+
+on:
+  pull_request:
+
+
+jobs:
+  ci:
+    name: Building ${{ matrix.file }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        file:
+          - tesla-ble-esp32-generic.yml
+          - tesla-ble-m5stack-atoms3.yml
+          - tesla-ble-m5stack-nanoc6.yml
+    steps:
+      - uses: actions/checkout@v4.1.7
+      - name: Mock secrets.yaml from example
+        run: cp secrets.yaml.example secrets.yaml
+      - name: Get ESPHome version
+        id: get_esphome_version
+        # read esphome version from requirements.txt
+        run: |
+          esphome_version=$(grep esphome requirements.txt | cut -d'=' -f3)
+          echo "esphome_version=$esphome_version" >> "$GITHUB_OUTPUT"
+      - name: Build ESPHome firmware to verify configuration
+        uses: esphome/build-action@v3.2.0
+        with:
+          yaml_file: ${{ matrix.file }}
+          cache: true
+          version: ${{ steps.get_esphome_version.outputs.esphome_version }}
+
+
