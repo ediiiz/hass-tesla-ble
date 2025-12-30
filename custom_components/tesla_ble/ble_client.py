@@ -6,6 +6,7 @@ from typing import Any
 
 from bleak import BleakClient
 from bleak.exc import BleakError
+from bleak_retry_connector import establish_connection
 from homeassistant.components.bluetooth import async_ble_device_from_address
 from homeassistant.core import HomeAssistant
 
@@ -60,8 +61,11 @@ class TeslaHABLEClient(TeslaBLEInterface):
                 _LOGGER.error("Could not find device with address %s", address)
                 return False
 
-            self._client = BleakClient(device)
-            await self._client.connect()
+            self._client = await establish_connection(
+                BleakClient,
+                device,
+                name=address,
+            )
             _LOGGER.info("Successfully connected to Tesla vehicle at %s", address)
             return True
         except BleakError as err:
