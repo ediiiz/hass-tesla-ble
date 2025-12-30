@@ -388,6 +388,7 @@ class TeslaSessionManager:
 
         # Metdata for role
         wl_op.metadataForKey.keyFormFactor = vcsec_pb2.KEY_FORM_FACTOR_CLOUD_KEY
+        wl_op.metadataForKey.keyRole = role
 
         # Wait, the role needs to be set.
         # Looking at vcsec.proto, addPublicKeyToWhitelist is just PublicKey.

@@ -5,9 +5,9 @@ from collections.abc import Callable
 from typing import Final
 
 # Tesla BLE Service and Characteristic UUIDs
-TESLA_SERVICE_UUID: Final = "00000211-0000-1000-8000-00805f9b34fb"
-TESLA_WRITE_CHAR_UUID: Final = "00000002-0000-1000-8000-00805f9b34fb"
-TESLA_NOTIFY_CHAR_UUID: Final = "00000003-0000-1000-8000-00805f9b34fb"
+TESLA_SERVICE_UUID: Final = "00000211-b2d1-43f0-9b88-960cebf8b91e"
+TESLA_WRITE_CHAR_UUID: Final = "00000212-b2d1-43f0-9b88-960cebf8b91e"
+TESLA_NOTIFY_CHAR_UUID: Final = "00000213-b2d1-43f0-9b88-960cebf8b91e"
 
 
 class TeslaBLEInterface(ABC):
