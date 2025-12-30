@@ -10,7 +10,7 @@ We are building a Home Assistant Custom Component (Integration) named `hass-tesl
 - **Language:** Python 3.12+.
 - **Package Manager:** `uv` (for fast, reliable dependency management).
 - **Code Quality:**
-  - **Typing:** Strict typing with `mypy` (or `pyright` via `uv`).
+  - **Typing:** Strict typing with `ty`
   - **Linting:** `ruff` for linting and formatting.
   - **Models:** `pydantic` for robust data validation and settings management.
 - **BLE Stack:** `homeassistant.components.bluetooth` (specifically `async_bleAK` client wrappers) to leverage proxies transparently.
