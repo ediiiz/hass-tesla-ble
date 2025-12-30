@@ -5,7 +5,29 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cryptography>=46.0.3",
+    "protobuf>=6.33.2",
     "pydantic>=2.12.5",
+]
+
+[dependency-groups]
+dev = [
+    "grpcio-tools>=1.76.0",
     "ruff>=0.14.10",
     "ty>=0.0.8",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = [
+    "custom_components/tesla_ble/core/proto/*_pb2.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "C4", "UP"]
+ignore = ["UP006", "UP035"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
