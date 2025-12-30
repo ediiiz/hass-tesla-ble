@@ -16,11 +16,7 @@ update:
 
 generate:
 	@echo "Regenerating protobuf files..."
-	mkdir -p ../generated/src ../generated/include/google/protobuf
-	python3 ../build/nanopb/generator/nanopb_generator.py --output-dir=../generated/src *.proto google/protobuf/*.proto
-	@echo "Moving generated headers to generated/include..."
-	mv ../generated/src/*.pb.h ../generated/include/
-	mv ../generated/src/google/protobuf/*.pb.h ../generated/include/google/protobuf/
+	uv run python -m grpc_tools.protoc -I. --python_out=../custom_components/tesla_ble/core/proto/ --pyi_out=../custom_components/tesla_ble/core/proto/ *.proto
 	@echo "Protobuf files regenerated successfully!"
 
 help:
