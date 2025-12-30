@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Setup Tesla BLE",
+        "description": "Select the Tesla vehicle to pair with. Ensure the vehicle is awake and nearby.",
+        "data": {
+          "device": "Vehicle"
+        }
+      },
+      "pair": {
+        "title": "Pairing with Vehicle",
+        "description": "A pairing request has been sent to the vehicle. Please confirm the pairing on the vehicle's touchscreen or by tapping your NFC key card on the center console."
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the vehicle. Ensure it is in range and Bluetooth is enabled.",
+      "pairing_failed": "Pairing failed. The request was timed out or rejected by the vehicle.",
+      "no_devices_found": "No Tesla vehicles found nearby.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This vehicle is already configured."
+    }
+  }
+}

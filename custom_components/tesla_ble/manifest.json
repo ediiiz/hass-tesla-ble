@@ -1,0 +1,10 @@
+{
+  "domain": "tesla_ble",
+  "name": "Tesla BLE",
+  "codeowners": [],
+  "config_flow": true,
+  "iot_class": "local_push",
+  "requirements": ["cryptography", "protobuf", "pydantic"],
+  "documentation": "https://github.com/your-repo/hass-tesla-ble",
+  "version": "0.1.0"
+}
