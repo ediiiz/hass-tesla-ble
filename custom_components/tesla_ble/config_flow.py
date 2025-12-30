@@ -64,9 +64,10 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Scan for Tesla devices
         discovered = async_discovered_service_info(self.hass)
         self._discovered_devices = {}
+        _LOGGER.debug("Starting scan. Total devices found: %d", len(discovered))
         for info in discovered:
             _LOGGER.debug(
-                "Discovered device: %s (%s), UUIDs: %s, Manufacturer Data: %s",
+                "Checking device: Name='%s', Address='%s', UUIDs=%s, MfgData=%s",
                 info.name,
                 info.address,
                 info.service_uuids,
