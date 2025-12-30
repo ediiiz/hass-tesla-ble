@@ -10,7 +10,7 @@
     "pydantic"
   ],
   "documentation": "https://github.com/your-repo/hass-tesla-ble",
-  "version": "0.1.2.1",
+  "version": "0.1.2.2",
   "bluetooth": [
     {
       "service_uuid": "00000211-b2d1-43f0-9b88-960cebf8b91e"

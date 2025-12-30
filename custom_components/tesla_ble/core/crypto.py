@@ -26,7 +26,7 @@ def generate_key_pair() -> tuple[ec.EllipticCurvePrivateKey, bytes]:
     """
     private_key = ec.generate_private_key(CURVE)
     public_key_bytes = private_key.public_key().public_bytes(
-        encoding=Encoding.X962, format=PublicFormat.UncompressedPoints
+        encoding=Encoding.X962, format=PublicFormat.UncompressedPoint
     )
     return private_key, public_key_bytes
 
@@ -70,7 +70,7 @@ def get_public_key_bytes(private_key: ec.EllipticCurvePrivateKey) -> bytes:
         The 65-byte uncompressed public key.
     """
     return private_key.public_key().public_bytes(
-        encoding=Encoding.X962, format=PublicFormat.UncompressedPoints
+        encoding=Encoding.X962, format=PublicFormat.UncompressedPoint
     )
 
 
