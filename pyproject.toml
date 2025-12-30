@@ -1,0 +1,11 @@
+[project]
+name = "hass-tesla-ble"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.12.5",
+    "ruff>=0.14.10",
+    "ty>=0.0.8",
+]
