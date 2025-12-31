@@ -1,5 +1,6 @@
 """Home Assistant BLE client implementation for Tesla BLE."""
 
+import asyncio
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -109,10 +110,21 @@ class TeslaHABLEClient(TeslaBLEInterface):
             return
 
         try:
-            # Tesla protocol uses write without response for performance
-            await self._client.write_gatt_char(
-                TESLA_WRITE_CHAR_UUID, data, response=False
-            )
+            # Tesla protocol uses write without response for performance.
+            # We must manually fragment the data into small chunks (20 bytes)
+            # because "Write Without Response" packets are not automatically
+            # fragmented by most BLE stacks and will be dropped if they exceed
+            # the negotiated MTU (or the default min MTU).
+            CHUNK_SIZE = 20
+            for i in range(0, len(data), CHUNK_SIZE):
+                chunk = data[i : i + CHUNK_SIZE]
+                _LOGGER.debug("Writing chunk %d/%d: %s", i // CHUNK_SIZE + 1, (len(data) + CHUNK_SIZE - 1) // CHUNK_SIZE, chunk.hex())
+                await self._client.write_gatt_char(
+                    TESLA_WRITE_CHAR_UUID, chunk, response=False
+                )
+                # Small sleep to avoid overwhelming the controller's TX queue
+                await asyncio.sleep(0.05)
+                
         except BleakError as err:
             _LOGGER.error("Error writing to Tesla vehicle characteristic: %s", err)
             # We don't disconnect here, but the connection might be dead

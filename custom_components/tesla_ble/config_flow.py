@@ -216,10 +216,19 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "Pairing message prepared (length=%d): %s", length, encoded_msg.hex()
             )
 
+            # Define a callback to log incoming notifications
+            def _notification_callback(data: bytes) -> None:
+                _LOGGER.debug("Received notification during pairing: %s", data.hex())
+            
+            # Subscribe to notifications BEFORE writing
+            _LOGGER.debug("Subscribing to notifications...")
+            await self._client.register_notification_callback(_notification_callback)
+            _LOGGER.debug("Subscribed to notifications.")
+
             # Set up a listener for the response
             self._pairing_task = asyncio.create_task(self._wait_for_pairing())
 
-            _LOGGER.debug("Writing to characteristic")
+            _LOGGER.debug("Writing to characteristic...")
             await self._client.write_characteristic(encoded_msg)
             _LOGGER.debug("Write successful")
         except Exception as e:
