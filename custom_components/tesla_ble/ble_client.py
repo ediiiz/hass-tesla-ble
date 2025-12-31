@@ -115,15 +115,33 @@ class TeslaHABLEClient(TeslaBLEInterface):
             # because "Write Without Response" packets are not automatically
             # fragmented by most BLE stacks and will be dropped if they exceed
             # the negotiated MTU (or the default min MTU).
+            #
+            # NOTE: BLE MTU is usually negotiated. Bleak handles this if response=True.
+            # For response=False, we must be careful.
+            
+            # Use a conservative chunk size.
             CHUNK_SIZE = 20
+            total_chunks = (len(data) + CHUNK_SIZE - 1) // CHUNK_SIZE
+            
+            _LOGGER.info(
+                "Writing %d bytes to %s in %d chunks",
+                len(data),
+                TESLA_WRITE_CHAR_UUID,
+                total_chunks
+            )
+
             for i in range(0, len(data), CHUNK_SIZE):
                 chunk = data[i : i + CHUNK_SIZE]
-                _LOGGER.debug("Writing chunk %d/%d: %s", i // CHUNK_SIZE + 1, (len(data) + CHUNK_SIZE - 1) // CHUNK_SIZE, chunk.hex())
+                chunk_num = i // CHUNK_SIZE + 1
+                _LOGGER.info("Writing chunk %d/%d: %s", chunk_num, total_chunks, chunk.hex())
+                
                 await self._client.write_gatt_char(
                     TESLA_WRITE_CHAR_UUID, chunk, response=False
                 )
                 # Small sleep to avoid overwhelming the controller's TX queue
                 await asyncio.sleep(0.05)
+            
+            _LOGGER.info("Finished writing all chunks")
                 
         except BleakError as err:
             _LOGGER.error("Error writing to Tesla vehicle characteristic: %s", err)

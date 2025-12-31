@@ -11,7 +11,7 @@
     "bleak-retry-connector"
   ],
   "documentation": "https://github.com/your-repo/hass-tesla-ble",
-  "version": "0.1.3.2",
+  "version": "0.1.3.3",
   "bluetooth": [
     {
       "service_uuid": "00000211-b2d1-43f0-9b88-960cebf8b91e"

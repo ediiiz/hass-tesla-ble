@@ -46,7 +46,8 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
 
         # Register notification callback
-        self.client.register_notification_callback(self._handle_notification)
+        # We cannot await here in __init__, so we do it in _async_update_data
+        # self.client.register_notification_callback(self._handle_notification)
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from the vehicle."""
@@ -57,9 +58,12 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     f"Failed to connect to Tesla vehicle at {self.address}"
                 )
 
-            # After connecting, we need to register notifications again because
-            # the client might have been recreated or reset.
+        # Always ensure notifications are registered for this coordinator instance
+        # This handles both fresh connections and existing connections passed from config flow
+        try:
             await self.client.register_notification_callback(self._handle_notification)
+        except Exception as e:
+            _LOGGER.debug("Failed to register notification callback (might be already registered): %s", e)
 
         # Ensure we have authenticated sessions
         for domain in [

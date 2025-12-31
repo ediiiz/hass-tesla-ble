@@ -202,9 +202,15 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         try:
             # Generate pairing message
-            _LOGGER.debug("Preparing pairing message for address: %s", self._address)
-            _LOGGER.debug("Current VIN in flow: %s", self._vin)
+            _LOGGER.info("Preparing pairing message for address: %s", self._address)
+            _LOGGER.info("Current VIN in flow: %s", self._vin)
+            
+            # Inspect Public Key
+            public_key = self._session_manager.public_key_bytes.hex()
+            _LOGGER.info("Public Key: %s", public_key)
+
             pairing_msg = self._session_manager.prepare_pairing_message()
+            _LOGGER.info("Protobuf message object: %s", pairing_msg)
 
             # Encode and prepend 2-byte BE length
             data = pairing_msg.SerializeToString()
@@ -212,25 +218,28 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             length = len(data)
             encoded_msg = struct.pack(">H", length) + data
-            _LOGGER.debug(
-                "Pairing message prepared (length=%d): %s", length, encoded_msg.hex()
+            _LOGGER.info(
+                "Pairing message prepared (proto_len=%d, total_len=%d): %s",
+                len(data),
+                length + 2,
+                encoded_msg.hex()
             )
 
             # Define a callback to log incoming notifications
             def _notification_callback(data: bytes) -> None:
-                _LOGGER.debug("Received notification during pairing: %s", data.hex())
+                _LOGGER.info("Received notification during pairing: %s", data.hex())
             
             # Subscribe to notifications BEFORE writing
-            _LOGGER.debug("Subscribing to notifications...")
+            _LOGGER.info("Subscribing to notifications...")
             await self._client.register_notification_callback(_notification_callback)
-            _LOGGER.debug("Subscribed to notifications.")
+            _LOGGER.info("Subscribed to notifications.")
 
             # Set up a listener for the response
             self._pairing_task = asyncio.create_task(self._wait_for_pairing())
 
-            _LOGGER.debug("Writing to characteristic...")
+            _LOGGER.info("Writing pairing message to characteristic...")
             await self._client.write_characteristic(encoded_msg)
-            _LOGGER.debug("Write successful")
+            _LOGGER.info("Write successful")
         except Exception as e:
             _LOGGER.exception("Error during pairing message generation or write: %s", e)
             raise
