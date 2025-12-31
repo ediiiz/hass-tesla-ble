@@ -1,15 +1,15 @@
 # Tesla BLE Local Control for Home Assistant
 
-A Home Assistant Addon built with TypeScript and Bun that enables local, low-latency control of Tesla vehicles via Bluetooth Low Energy (BLE). This addon communicates with vehicles using BLE and publishes all vehicle entities to MQTT for integration with Home Assistant.
+A Home Assistant Addon built with Rust that enables local, low-latency control of Tesla vehicles via Bluetooth Low Energy (BLE). This addon communicates with vehicles using BLE and publishes all vehicle entities to MQTT for integration with Home Assistant.
 
 > **⚠️ Work in Progress** - This project is currently under active development and is not yet functional. Do not attempt to install or use it.
 
 ## Features (Planned)
 
-- **TypeScript + Bun Runtime**: Modern, type-safe implementation with fast startup and low resource usage
+- **Rust + bluer**: Type-safe, high-performance implementation with low resource footprint and memory safety
 - **Local BLE Control**: Commands sent directly from the addon to vehicle via BLE, no Tesla Cloud dependency
 - **MQTT Entity Publishing**: All vehicle state and controls published as MQTT entities for Home Assistant discovery
-- **USB Bluetooth Adapter Passthrough**: Direct passthrough of USB Bluetooth adapters to the addon container for native BLE access
+- **USB Bluetooth Adapter Passthrough**: Direct passthrough of USB Bluetooth adapters to the addon container for native BLE access via BlueZ
 - **Built-in Pairing Handler**: The addon handles the complete vehicle pairing flow including whitelist operations
 - **Secure Protocol**: Full implementation of Tesla Vehicle Command Protocol including ECDH key exchange and authenticated messaging
 - **Planned Entities**:
@@ -21,32 +21,34 @@ A Home Assistant Addon built with TypeScript and Bun that enables local, low-lat
 
 ## Architecture
 
-This addon follows the Home Assistant Addon specification with a TypeScript codebase running on Bun.
+This addon follows the Home Assistant Addon specification with a Rust codebase compiled to a native binary.
 
 ### Project Structure
 
 ```
 hass-tesla-ble/
-├── index.ts              # Main addon entry point
-├── config.json           # Addon configuration
-├── Dockerfile            # Container build (Bun runtime)
-├── package.json          # TypeScript dependencies
-├── tsconfig.json         # TypeScript configuration
-├── bun.lockb             # Bun lockfile
-├── proto/                # Protocol buffer definitions
+├── src/
+│   └── main.rs              # Main addon entry point
+├── Cargo.toml               # Rust dependencies
+├── Cargo.lock               # Lockfile
+├── Dockerfile               # Container build (Rust)
+├── build.rs                 # Prost build script for proto compilation
+├── config.json              # Addon configuration
+├── proto/                   # Protocol buffer definitions
 │   ├── vcsec.proto
 │   ├── vehicle.proto
 │   └── ...
-└── references/           # Reference implementations
+└── references/              # Reference implementations
 ```
 
 ### Tech Stack
 
-- **Runtime**: Bun - Fast JavaScript runtime with native TypeScript support
-- **Language**: TypeScript - Type-safe development
-- **Communication**: MQTT - Entity publishing to Home Assistant
-- **Bluetooth**: Web Bluetooth / Noble (depending on platform) - BLE connectivity
-- **Protocol**: Protocol Buffers - Vehicle communication protocol
+- **Language**: Rust - Memory-safe, zero-cost abstractions, excellent async support
+- **BLE**: bluer - BlueZ D-Bus bindings for Bluetooth Low Energy on Linux
+- **MQTT**: rumqttd/paho-mqtt - MQTT client for Home Assistant communication
+- **Protocol Buffers**: prost + prost-build - Compile Protocol Buffers to Rust
+- **Async Runtime**: tokio - Async runtime for concurrent BLE and MQTT operations
+- **Cryptography**: ed25519, x25519 - ECDH key exchange and message signing
 
 ## Installation (Not Yet Available)
 
@@ -89,7 +91,12 @@ The addon automatically handles:
 
 ### Bluetooth Configuration
 
-The addon requires a USB Bluetooth adapter passed through from the host system. This provides direct access to BLE hardware for maximum reliability and performance.
+The addon requires a USB Bluetooth adapter passed through from the host system. This provides direct access to BLE hardware via BlueZ for maximum reliability and performance.
+
+**Requirements:**
+- BlueZ Bluetooth daemon must be available in the container
+- D-Bus system bus access for bluer crate
+- USB Bluetooth adapter passthrough enabled
 
 1. Connect a USB Bluetooth dongle to your Home Assistant host
 2. In the add-on options, enable USB passthrough for the adapter
@@ -99,8 +106,8 @@ The addon requires a USB Bluetooth adapter passed through from the host system. 
 
 The addon handles the complete Tesla vehicle pairing flow:
 
-1. **Discovery**: Scan for nearby Tesla vehicles via BLE
-2. **Key Generation**: Generate a unique cryptographic key pair for the addon
+1. **Discovery**: Scan for nearby Tesla vehicles via BLE using bluer
+2. **Key Generation**: Generate a unique cryptographic key pair using Rust crypto libraries
 3. **Whitelist Request**: Send a pairing request to the vehicle
 4. **Authorization**: Approve the request on the vehicle's center console or with a key card
 5. **Verification**: Confirm successful pairing and store credentials
@@ -121,39 +128,71 @@ homeassistant/sensor/{vehicle_vin}/battery/config
 
 ## Protocol Implementation
 
-This project implements the Tesla Vehicle Command Protocol using the provided Protocol Buffer definitions in the [`proto/`](proto/) directory:
+This project implements the Tesla Vehicle Command Protocol using the provided Protocol Buffer definitions in the [`proto/`](proto/) directory, compiled to Rust via prost:
 
 - **[`vcsec.proto`](proto/vcsec.proto)**: Vehicle Security (key pairing, authorization)
 - **[`vehicle.proto`](proto/vehicle.proto)**: Vehicle control messages
 - **[`car_server.proto`](proto/car_server.proto)**: Car server communication
 - **[`common.proto`](proto/common.proto)**: Common message types
 
+Protocol buffer compilation is handled automatically via `build.rs` using `prost-build`.
+
 ## Development Status
 
-- [ ] TypeScript project setup
-- [ ] Bun runtime configuration
-- [ ] BLE client implementation
-- [ ] Protocol buffer compilation
-- [ ] MQTT broker connection
+- [ ] Rust project setup (Cargo.toml, main.rs)
+- [ ] BlueZ/bluer integration
+- [ ] Protocol buffer compilation (prost, build.rs)
+- [ ] BLE client implementation (scanning, connection, characteristic operations)
+- [ ] MQTT client integration
 - [ ] Home Assistant MQTT discovery
-- [ ] Vehicle pairing flow
+- [ ] Vehicle pairing flow (key generation, whitelisting, ECDH)
 - [ ] Basic command execution (lock/unlock)
 - [ ] Sensor state monitoring
-- [ ] Docker container build
+- [ ] Docker container build (rust:alpine base)
 - [ ] Testing and debugging
 
 ## Building from Source
 
 ```bash
-# Install dependencies
-bun install
+# Build the Rust project
+cargo build --release
 
-# Build TypeScript
-bun run build
+# Run in release mode
+cargo run --release
 
-# Run for development
-bun run dev
+# Run tests
+cargo test
 ```
+
+The `build.rs` script automatically compiles Protocol Buffer definitions using `prost-build` before the main compilation.
+
+## Dependencies
+
+Key Rust crates used in this project:
+
+```toml
+[dependencies]
+bluer = "0.17"          # BlueZ D-Bus bindings for BLE
+rumqttd = "0.19"        # MQTT client (or paho-mqtt)
+prost = "0.12"          # Protocol Buffers runtime
+tokio = { version = "1", features = ["full"] }  # Async runtime
+ed25519-dalek = "2"     # Ed25519 signatures
+x25519-dalek = "2"      # ECDH key exchange
+serde = "1"             # Serialization
+serde_json = "1"        # JSON support
+log = "0.4"             # Logging
+env_logger = "0.11"     # Logger implementation
+
+[build-dependencies]
+prost-build = "0.12"    # Protocol Buffer compiler
+```
+
+## System Requirements
+
+- Home Assistant OS or Supervisor
+- USB Bluetooth adapter compatible with BlueZ
+- MQTT broker (typically Home Assistant's Mosquitto add-on)
+- Docker container support for Rust-based add-on
 
 ## Disclaimer
 
