@@ -15,6 +15,7 @@ from homeassistant.components.bluetooth import (
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import AbortFlow
 
 from .ble_client import TeslaHABLEClient
 from .const import (
@@ -49,11 +50,18 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the initial step."""
         if user_input is not None:
             self._address = user_input["device"]
-            
-            # Try to extract VIN from the name if we cached it, or just use the device name
+
+            # Try to extract VIN from the name if we cached it, or just use the
+            # device name
             name = self._discovered_devices.get(self._address)
-            if name and name.startswith("S") and name.endswith("C") and len(name) == 18:
-                # Name is effectively the partial VIN hash, but we don't have the full VIN yet
+            if (
+                name
+                and name.startswith("S")
+                and name.endswith("C")
+                and len(name) == 18
+            ):
+                # Name is effectively the partial VIN hash, but we don't have
+                # the full VIN yet
                 # We will update the config entry title later once we have the full VIN
                 pass
 
@@ -64,7 +72,7 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Scan for Tesla devices
         discovered = async_discovered_service_info(self.hass)
         self._discovered_devices = {}
-        _LOGGER.debug("Starting scan. Total devices found: %d", len(discovered))
+        _LOGGER.debug("Starting scan. Total devices found: %d", len(discovered))  # type: ignore
         for info in discovered:
             _LOGGER.debug(
                 "Checking device: Name='%s', Address='%s', UUIDs=%s, MfgData=%s",
@@ -73,15 +81,23 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 info.service_uuids,
                 info.manufacturer_data,
             )
-            
+
             is_tesla = False
             # Check by Service UUID
             # TESLA_SERVICE_UUID is the official one (0211)
             # but some proxies/adapters report 1122
-            if TESLA_SERVICE_UUID in info.service_uuids or "00001122-0000-1000-8000-00805f9b34fb" in info.service_uuids:
+            if (
+                TESLA_SERVICE_UUID in info.service_uuids
+                or "00001122-0000-1000-8000-00805f9b34fb" in info.service_uuids
+            ):
                 is_tesla = True
             # Check by Name pattern (S<16hex>C)
-            elif info.name and info.name.startswith("S") and info.name.endswith("C") and len(info.name) == 18:
+            elif (
+                info.name
+                and info.name.startswith("S")
+                and info.name.endswith("C")
+                and len(info.name) == 18
+            ):
                  # Check if the middle part is hex
                 try:
                     int(info.name[1:-1], 16)
@@ -196,7 +212,9 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             length = len(data)
             encoded_msg = struct.pack(">H", length) + data
-            _LOGGER.debug("Pairing message prepared (length=%d): %s", length, encoded_msg.hex())
+            _LOGGER.debug(
+                "Pairing message prepared (length=%d): %s", length, encoded_msg.hex()
+            )
 
             # Set up a listener for the response
             self._pairing_task = asyncio.create_task(self._wait_for_pairing())
@@ -229,4 +247,4 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Abort if the device is already configured."""
         for entry in self._async_current_entries():
             if entry.data.get(CONF_ADDRESS) == self._address:
-                raise config_entries.AlreadyConfigured
+                raise AbortFlow("already_configured")

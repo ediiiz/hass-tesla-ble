@@ -9,7 +9,7 @@ from homeassistant.const import CONF_ADDRESS, Platform
 from homeassistant.core import HomeAssistant
 
 from .ble_client import TeslaHABLEClient
-from .const import CONF_PRIVATE_KEY, CONF_PUBLIC_KEY, DOMAIN
+from .const import CONF_PRIVATE_KEY, CONF_VIN, DOMAIN
 from .coordinator import TeslaBLEDataUpdateCoordinator
 from .core.session_manager import TeslaSessionManager
 

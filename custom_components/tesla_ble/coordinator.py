@@ -112,6 +112,9 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         msg_type = parsed.get("msg_type")
         payload = parsed.get("payload")
 
+        if payload is None:
+            return
+
         _LOGGER.debug("Received notification: domain=%s, type=%s", domain, msg_type)
 
         if domain == universal_message_pb2.DOMAIN_VEHICLE_SECURITY:
@@ -119,7 +122,8 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 status: vcsec_pb2.VehicleStatus = payload.vehicleStatus
                 # Update lock state
                 self.data["locked"] = (
-                    status.vehicleLockState == vcsec_pb2.VEHICLE_LOCK_STATE_LOCKED
+                    status.vehicleLockState
+                    == vcsec_pb2.VehicleLockState_E.VEHICLELOCKSTATE_LOCKED
                 )
                 _LOGGER.debug("Updated lock state: %s", self.data["locked"])
                 self.async_set_updated_data(self.data)

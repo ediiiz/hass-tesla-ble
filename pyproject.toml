@@ -30,6 +30,7 @@ line-length = 88
 target-version = "py312"
 extend-exclude = [
     "custom_components/tesla_ble/core/proto/*_pb2.py",
+    "custom_components/tesla_ble/core/proto/*_pb2.pyi",
 ]
 
 [tool.ruff.lint]
@@ -39,3 +40,6 @@ ignore = ["UP006", "UP035"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.ty.src]
+exclude = ["custom_components/tesla_ble/core/proto"]

@@ -20,7 +20,12 @@ from .crypto import (
     get_public_key_bytes,
     load_private_key,
 )
-from .proto import keys_pb2, signatures_pb2, universal_message_pb2, vcsec_pb2 # type: ignore
+from .proto import (  # type: ignore
+    keys_pb2,
+    signatures_pb2,
+    universal_message_pb2,
+    vcsec_pb2,
+)
 
 if TYPE_CHECKING:
     pass
@@ -145,7 +150,7 @@ class TeslaSessionManager:
         session.state = AuthenticationState.HANDSHAKING
 
         msg = universal_message_pb2.RoutableMessage()
-        msg.to_destination.domain = domain
+        msg.to_destination.domain = domain  # type: ignore
         msg.from_destination.domain = universal_message_pb2.DOMAIN_BROADCAST
 
         msg.session_info_request.public_key = self._public_key_bytes
@@ -250,7 +255,7 @@ class TeslaSessionManager:
         session.counter += 1
 
         msg = universal_message_pb2.RoutableMessage()
-        msg.to_destination.domain = domain
+        msg.to_destination.domain = domain  # type: ignore
         msg.from_destination.domain = universal_message_pb2.DOMAIN_BROADCAST
         msg.flags = universal_message_pb2.FLAG_USER_COMMAND
 
@@ -261,6 +266,8 @@ class TeslaSessionManager:
         expires_at = int(time.time() - self._vehicle_clock_offset) + 5
 
         personalized = msg.signature_data.AES_GCM_Personalized_data
+        if session.epoch is None:
+            raise ValueError("Session epoch is missing")
         personalized.epoch = session.epoch
         personalized.counter = session.counter
         personalized.expires_at = expires_at
@@ -270,7 +277,9 @@ class TeslaSessionManager:
 
         # Prepare AAD
         sig_type = signatures_pb2.SIGNATURE_TYPE_AES_GCM_PERSONALIZED
-        aad = self._prepare_aad(domain, session.counter, session.epoch, sig_type, expires_at)
+        aad = self._prepare_aad(
+            domain, session.counter, session.epoch, sig_type, expires_at
+        )
 
         _LOGGER.debug(
             "Wrapping message for domain %s, counter %d, expires_at %d",
@@ -443,7 +452,7 @@ class TeslaSessionManager:
         # 1. Create PermissionChange (to specify role)
         perm_change = vcsec_pb2.PermissionChange()
         perm_change.key.PublicKeyRaw = self._public_key_bytes
-        perm_change.keyRole = role
+        perm_change.keyRole = role  # type: ignore
 
         # 2. Create WhitelistOperation
         wl_op = vcsec_pb2.WhitelistOperation()
@@ -455,7 +464,8 @@ class TeslaSessionManager:
         unsigned_msg.WhitelistOperation.CopyFrom(wl_op)
 
         # 4. Wrap in ToVCSECMessage with PRESENT_KEY signature
-        # This is the standard pairing message that vehicles expect when whitelisting a new key.
+        # This is the standard pairing message that vehicles expect when
+        # whitelisting a new key.
         to_vcsec = vcsec_pb2.ToVCSECMessage()
         to_vcsec.signedMessage.protobufMessageAsBytes = unsigned_msg.SerializeToString()
         to_vcsec.signedMessage.signatureType = vcsec_pb2.SIGNATURE_TYPE_PRESENT_KEY

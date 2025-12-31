@@ -4,7 +4,7 @@ import logging
 import struct
 from typing import TYPE_CHECKING, Any
 
-from .proto import ( # type: ignore
+from .proto import (  # type: ignore
     car_server_pb2,
     universal_message_pb2,
     vcsec_pb2,
@@ -119,7 +119,7 @@ class TeslaProtocol:
     def _create_vcsec_rke_action(self, rke_action: int) -> bytes:
         """Helper to create a VCSEC RKE action message."""
         unsigned_msg = vcsec_pb2.UnsignedMessage()
-        unsigned_msg.RKEAction = rke_action
+        unsigned_msg.RKEAction = rke_action  # type: ignore
         return self._wrap_vcsec_unsigned_message(unsigned_msg)
 
     def _create_vcsec_closure_move(self, **kwargs: int) -> bytes:

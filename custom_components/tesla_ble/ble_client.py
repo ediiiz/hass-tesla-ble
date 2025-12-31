@@ -56,7 +56,9 @@ class TeslaHABLEClient(TeslaBLEInterface):
 
         try:
             # Get a BleakClient wrapper that works with HA's proxies
-            device = async_ble_device_from_address(self._hass, address, connectable=True)
+            device = async_ble_device_from_address(
+                self._hass, address, connectable=True
+            )
             if not device:
                 _LOGGER.error("Could not find device with address %s", address)
                 return False

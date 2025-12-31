@@ -133,7 +133,11 @@ def derive_hkdf_key(
     Returns:
         The derived key.
     """
-    _LOGGER.debug("Deriving HKDF key with info: %s, salt: %s", info, salt.hex() if salt else "None")
+    _LOGGER.debug(
+        "Deriving HKDF key with info: %s, salt: %s",
+        info,
+        salt.hex() if salt else "None",
+    )
     hkdf = HKDF(
         algorithm=hashes.SHA256(),
         length=length,
