@@ -1,11 +1,11 @@
-// MQTT client module using rumqttd
+// MQTT client module using rumqttc
 
 use log::{debug, info};
-use rumqttd::{Client, MqttOptions, Notification, QoS};
+use rumqttc::{AsyncClient, MqttOptions, QoS, Event, Incoming};
 use crate::config::MqttConfig;
 
 pub struct MqttClient {
-    client: Client,
+    client: AsyncClient,
     config: MqttConfig,
 }
 
@@ -18,13 +18,13 @@ impl MqttClient {
         }
 
         info!("Connecting to MQTT broker: {}:{}", config.host, config.port);
-        let (client, mut eventloop) = Client::new(mqttoptions, 10);
+        let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
 
         // Start event loop in background
         tokio::spawn(async move {
             loop {
                 match eventloop.poll().await {
-                    Ok(Notification::ConnAck(_)) => {
+                    Ok(Event::Incoming(Incoming::ConnAck(_))) => {
                         info!("MQTT Connected");
                     }
                     Ok(notification) => {

@@ -18,7 +18,7 @@ impl BleAdapter {
         // Ensure adapter is powered on
         adapter.set_powered(true).await?;
 
-        let name = adapter.name()?;
+        let name = adapter.name();
         debug!("Adapter name: {}", name);
 
         Ok(BleAdapter {

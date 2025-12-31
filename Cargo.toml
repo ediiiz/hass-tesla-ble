@@ -11,7 +11,7 @@ license = "MIT"
 bluer = { version = "0.17", features = ["full"] }
 
 # MQTT client
-rumqttd = "0.19"
+rumqttc = "0.24"
 
 # Protocol Buffers
 prost = "0.12"
