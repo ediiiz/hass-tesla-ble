@@ -6,17 +6,17 @@
 ## Phase 1: Setup
 *(Project initialization and environment preparation)*
 
-- [ ] T001 Verify project structure and prerequisites
-- [ ] T002 Verify proto definitions and core library availability in `custom_components/tesla_ble/core/`
+- [x] T001 Verify project structure and prerequisites
+- [x] T002 Verify proto definitions and core library availability in `custom_components/tesla_ble/core/`
 
 ## Phase 2: Foundational
 *(Blocking prerequisites for all user stories: Smart Wake & Options Flow)*
 
 **Goal**: Establish the "Smart Wake" polling infrastructure and user-configurable timeouts required by all entities.
 
-- [ ] T003 **[P]** Implement Options Flow for timeout configuration in `custom_components/tesla_ble/config_flow.py`
-- [ ] T004 Implement Smart Wake Management polling logic in `custom_components/tesla_ble/coordinator.py`
-- [ ] T005 Implement unavailability timeout logic in `custom_components/tesla_ble/entity.py`
+- [x] T003 **[P]** Implement Options Flow for timeout configuration in `custom_components/tesla_ble/config_flow.py`
+- [x] T004 Implement Smart Wake Management polling logic in `custom_components/tesla_ble/coordinator.py`
+- [x] T005 Implement unavailability timeout logic in `custom_components/tesla_ble/entity.py`
 
 ## Phase 3: User Story 1 - Core Charging & Climate Management (P1)
 *(High-frequency daily control: Charging & HVAC)*

@@ -45,6 +45,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         client,
         session_manager,
         address,
+        entry,
     )
 
     # Fetch initial data

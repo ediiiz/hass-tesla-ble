@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS, DOMAIN
 from .coordinator import TeslaBLEDataUpdateCoordinator
 
 
@@ -40,6 +41,22 @@ class TeslaVehicleEntity(CoordinatorEntity[TeslaBLEDataUpdateCoordinator]):
         if self.entity_description:
             return f"{self.vin}_{self.entity_description.key}"
         return f"{self.vin}_{self.__class__.__name__.lower()}"
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        if not self.coordinator.last_update_success:
+            return False
+
+        last_seen = self.coordinator.data.get("last_seen")
+        if last_seen is None:
+            return False
+
+        timeout = self.coordinator.entry.options.get(
+            CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS
+        )
+
+        return (dt_util.utcnow() - last_seen).total_seconds() < timeout
 
 
 # Backwards-compatible alias (older code used TeslaBLEEntity).

@@ -14,16 +14,18 @@ from homeassistant.components.bluetooth import (
     BluetoothServiceInfoBleak,
     async_discovered_service_info,
 )
-from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_ADDRESS
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import AbortFlow
 
 from .ble_client import TeslaHABLEClient
 from .const import (
     CONF_PRIVATE_KEY,
     CONF_PUBLIC_KEY,
+    CONF_TIMEOUT_SECONDS,
     CONF_VIN,
+    DEFAULT_TIMEOUT_SECONDS,
     DOMAIN,
     TESLA_SERVICE_UUID,
 )
@@ -385,3 +387,40 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         for entry in self._async_current_entries():
             if entry.data.get(CONF_ADDRESS) == self._address:
                 raise AbortFlow("already_configured")
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Create the options flow."""
+        return TeslaBLEOptionsFlowHandler(config_entry)
+
+
+class TeslaBLEOptionsFlowHandler(OptionsFlow):
+    """Handle an options flow for Tesla BLE."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self._config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_TIMEOUT_SECONDS,
+                        default=self._config_entry.options.get(
+                            CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS
+                        ),
+                    ): int,
+                }
+            ),
+        )

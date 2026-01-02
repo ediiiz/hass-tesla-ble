@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import Any
 
 from homeassistant.components import bluetooth
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -28,6 +29,7 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         client: TeslaHABLEClient,
         session_manager: TeslaSessionManager,
         address: str,
+        entry: ConfigEntry,
     ) -> None:
         """Initialize the coordinator."""
         super().__init__(
@@ -40,6 +42,11 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.session_manager = session_manager
         self.protocol = TeslaProtocol(session_manager)
         self.address = address
+        self.entry = entry
+
+        # Smart Wake Management
+        self.last_interaction = dt_util.utcnow()
+
         self.data = {
             "connected": False,
             "rssi": None,
@@ -123,23 +130,43 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         "Failed to start handshake for domain %s: %s", domain, err
                     )
 
-        # Poll for status if authenticated
-        try:
-            if self.session_manager.is_authenticated(
-                universal_message_pb2.DOMAIN_VEHICLE_SECURITY
-            ):
-                _LOGGER.debug("Polling VCSEC status")
-                poll_msg = self.protocol.create_vcsec_status_poll()
-                await self.client.write_characteristic(poll_msg)
+        # Smart Wake Management Logic
+        # 1. Active states override sleep
+        is_charging = (
+            self.data.get("charge_state", {}).get("charging_state") == "charging"
+        )
+        is_unlocked = self.data.get("locked") is False
+        # TODO: Add User Present check when implemented
 
-            if self.session_manager.is_authenticated(
-                universal_message_pb2.DOMAIN_INFOTAINMENT
-            ):
-                _LOGGER.debug("Polling Infotainment status")
-                poll_msg = self.protocol.create_infotainment_poll()
-                await self.client.write_characteristic(poll_msg)
-        except Exception as err:
-            _LOGGER.warning("Error polling vehicle: %s", err)
+        # 2. Wake window (11 mins since last interaction)
+        elapsed = (dt_util.utcnow() - self.last_interaction).total_seconds()
+        in_wake_window = elapsed < 660  # 11 minutes
+
+        should_poll = is_charging or is_unlocked or in_wake_window
+
+        if should_poll:
+            # Poll for status if authenticated
+            try:
+                if self.session_manager.is_authenticated(
+                    universal_message_pb2.DOMAIN_VEHICLE_SECURITY
+                ):
+                    _LOGGER.debug("Polling VCSEC status")
+                    poll_msg = self.protocol.create_vcsec_status_poll()
+                    await self.client.write_characteristic(poll_msg)
+
+                if self.session_manager.is_authenticated(
+                    universal_message_pb2.DOMAIN_INFOTAINMENT
+                ):
+                    _LOGGER.debug("Polling Infotainment status")
+                    poll_msg = self.protocol.create_infotainment_poll()
+                    await self.client.write_characteristic(poll_msg)
+            except Exception as err:
+                _LOGGER.warning("Error polling vehicle: %s", err)
+        else:
+            _LOGGER.debug(
+                "Smart Wake: Vehicle sleeping (elapsed=%s s), skipping poll",
+                int(elapsed),
+            )
 
         return self.data
 
@@ -217,6 +244,9 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_send_command(self, command_bytes: bytes) -> None:
         """Send a command to the vehicle."""
+        # Reset wake window on command
+        self.last_interaction = dt_util.utcnow()
+
         if not self.client.is_connected:
             if not await self.client.connect(self.address):
                 _LOGGER.error("Failed to connect to send command")
