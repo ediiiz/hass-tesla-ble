@@ -1,0 +1,473 @@
+from __future__ import annotations
+
+import logging
+import secrets
+import time
+from enum import IntEnum
+from typing import TYPE_CHECKING, Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from .crypto import (
+    TeslaSessionKeys,
+    aes_gcm_decrypt,
+    aes_gcm_encrypt,
+    compute_shared_secret,
+    derive_hkdf_key,
+    derive_key_id,
+    generate_key_pair,
+    get_private_key_bytes,
+    get_public_key_bytes,
+    load_private_key,
+)
+from .proto import (  # type: ignore
+    keys_pb2,
+    signatures_pb2,
+    universal_message_pb2,
+    vcsec_pb2,
+)
+
+if TYPE_CHECKING:
+    pass
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class AuthenticationState(IntEnum):
+    """Authentication state of a session."""
+
+    UNAUTHENTICATED = 0
+    HANDSHAKING = 1
+    AUTHENTICATED = 2
+
+
+class TeslaSession(BaseModel):
+    """Container for session state for a specific domain."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    domain: int  # universal_message_pb2.Domain
+    state: AuthenticationState = AuthenticationState.UNAUTHENTICATED
+    counter: int = 0
+    epoch: bytes | None = None
+    session_keys: TeslaSessionKeys | None = None
+    vehicle_public_key: bytes | None = None
+    vehicle_key_id: bytes | None = None
+    last_update: float = Field(default_factory=time.time)
+
+    def is_authenticated(self) -> bool:
+        """Check if the session is authenticated."""
+        return (
+            self.state == AuthenticationState.AUTHENTICATED
+            and self.session_keys is not None
+        )
+
+
+class TeslaSessionManager:
+    """Manages authentication sessions with a Tesla vehicle."""
+
+    def __init__(
+        self,
+        private_key_bytes: bytes | None = None,
+        vin: str | None = None,
+    ) -> None:
+        """Initialize the session manager.
+
+        Args:
+            private_key_bytes: The local 32-byte private key.
+            If None, a new one will be generated.
+            vin: The vehicle identification number.
+        """
+        if private_key_bytes:
+            self._private_key = load_private_key(private_key_bytes)
+        else:
+            self._private_key, _ = generate_key_pair()
+
+        self._public_key_bytes = get_public_key_bytes(self._private_key)
+        self._key_id = derive_key_id(self._public_key_bytes)
+        self._vin = vin
+        self._vehicle_clock_offset: float = 0.0
+
+        self._sessions: dict[int, TeslaSession] = {
+            universal_message_pb2.DOMAIN_VEHICLE_SECURITY: TeslaSession(
+                domain=universal_message_pb2.DOMAIN_VEHICLE_SECURITY
+            ),
+            universal_message_pb2.DOMAIN_INFOTAINMENT: TeslaSession(
+                domain=universal_message_pb2.DOMAIN_INFOTAINMENT
+            ),
+        }
+
+    def set_vin(self, vin: str) -> None:
+        """Set the vehicle VIN."""
+        self._vin = vin
+
+    @property
+    def private_key_bytes(self) -> bytes:
+        """Get the local private key bytes."""
+        return get_private_key_bytes(self._private_key)
+
+    @property
+    def public_key_bytes(self) -> bytes:
+        """Get the local uncompressed public key bytes."""
+        return self._public_key_bytes
+
+    @property
+    def key_id(self) -> bytes:
+        """Get the local 4-byte key ID."""
+        return self._key_id
+
+    def get_session(self, domain: int) -> TeslaSession:
+        """Get the session for a specific domain."""
+        if domain not in self._sessions:
+            self._sessions[domain] = TeslaSession(domain=domain)
+        return self._sessions[domain]
+
+    def is_authenticated(self, domain: int) -> bool:
+        """Check if a domain is authenticated."""
+        return self.get_session(domain).is_authenticated()
+
+    def invalidate_session(self, domain: int) -> None:
+        """Invalidate the session for a domain."""
+        _LOGGER.info("Invalidating session for domain %s", domain)
+        session = self.get_session(domain)
+        session.state = AuthenticationState.UNAUTHENTICATED
+        session.session_keys = None
+        session.epoch = None
+        session.counter = 0
+
+    def prepare_session_info_request(
+        self, domain: int
+    ) -> Any:
+        """Prepare a SessionInfoRequest message.
+
+        Args:
+            domain: The target domain.
+
+        Returns:
+            The prepared RoutableMessage.
+        """
+        session = self.get_session(domain)
+        session.state = AuthenticationState.HANDSHAKING
+
+        msg = universal_message_pb2.RoutableMessage()
+        msg.to_destination.domain = domain  # type: ignore
+        msg.from_destination.domain = universal_message_pb2.DOMAIN_BROADCAST
+
+        msg.session_info_request.public_key = self._public_key_bytes
+        # Reference implementation uses 4 bytes of random challenge
+        msg.session_info_request.challenge = secrets.token_bytes(4)
+
+        return msg
+
+    def update_session(
+        self, domain: int, session_info: Any
+    ) -> None:
+        """Update session state from a SessionInfo message.
+
+        Args:
+            domain: The domain the info came from.
+            session_info: The parsed SessionInfo message.
+        """
+        session = self.get_session(domain)
+
+        _LOGGER.debug(
+            "Updating session for %s: counter=%d, status=%s",
+            domain,
+            session_info.counter,
+            session_info.status,
+        )
+
+        if session_info.status != signatures_pb2.SESSION_INFO_STATUS_OK:
+            _LOGGER.error("Session info error for %s: %s", domain, session_info.status)
+            self.invalidate_session(domain)
+            return
+
+        session.counter = session_info.counter
+        session.epoch = session_info.epoch
+        session.vehicle_public_key = session_info.publicKey
+        session.vehicle_key_id = derive_key_id(session_info.publicKey)
+
+        # Update clock offset: vehicle_time = local_time - offset
+        # session_info.clock_time is vehicle's uptime or similar
+        self._vehicle_clock_offset = time.time() - session_info.clock_time
+
+        # Derive session keys
+        _LOGGER.debug("Deriving session keys for domain %s", domain)
+        shared_secret = compute_shared_secret(
+            self._private_key, session.vehicle_public_key
+        )
+
+        # Salt: epoch + local_key_id + vehicle_key_id
+        if session.epoch is None:
+            _LOGGER.error("Epoch is None during session update")
+            self.invalidate_session(domain)
+            return
+
+        salt = session.epoch + self._key_id + session.vehicle_key_id
+        _LOGGER.debug("Handshake salt: %s", salt.hex())
+
+        # Encryption key
+        enc_key = derive_hkdf_key(
+            shared_secret=shared_secret,
+            salt=salt,
+            info=b"authenticated command",
+            length=16,
+        )
+
+        # Authentication key
+        auth_key = derive_hkdf_key(
+            shared_secret=shared_secret,
+            salt=salt,
+            info=b"authenticated command hmac",
+            length=16,
+        )
+
+        session.session_keys = TeslaSessionKeys(
+            encryption_key=enc_key, authentication_key=auth_key
+        )
+        session.state = AuthenticationState.AUTHENTICATED
+        session.last_update = time.time()
+
+        _LOGGER.info(
+            "Session authenticated for domain %s with counter %d",
+            domain,
+            session.counter,
+        )
+
+    def wrap_message(
+        self,
+        domain: int,
+        payload_bytes: bytes,
+    ) -> Any:
+        """Wrap a payload in an authenticated RoutableMessage.
+
+        Args:
+            domain: The target domain.
+            payload_bytes: The serialized sub-message.
+
+        Returns:
+            The authenticated RoutableMessage.
+        """
+        session = self.get_session(domain)
+        if not session.is_authenticated():
+            raise ValueError(f"Session for domain {domain} is not authenticated")
+
+        session.counter += 1
+
+        msg = universal_message_pb2.RoutableMessage()
+        msg.to_destination.domain = domain  # type: ignore
+        msg.from_destination.domain = universal_message_pb2.DOMAIN_BROADCAST
+        msg.flags = universal_message_pb2.FLAG_USER_COMMAND
+
+        # Prepare signature data
+        msg.signature_data.signer_identity.public_key = self._public_key_bytes
+
+        # Calculate expiration (now + 5s relative to vehicle clock zero)
+        expires_at = int(time.time() - self._vehicle_clock_offset) + 5
+
+        personalized = msg.signature_data.AES_GCM_Personalized_data
+        if session.epoch is None:
+            raise ValueError("Session epoch is missing")
+        personalized.epoch = session.epoch
+        personalized.counter = session.counter
+        personalized.expires_at = expires_at
+
+        nonce = secrets.token_bytes(12)
+        personalized.nonce = nonce
+
+        # Prepare AAD
+        sig_type = signatures_pb2.SIGNATURE_TYPE_AES_GCM_PERSONALIZED
+        aad = self._prepare_aad(
+            domain, session.counter, session.epoch, sig_type, expires_at
+        )
+
+        _LOGGER.debug(
+            "Wrapping message for domain %s, counter %d, expires_at %d",
+            domain,
+            session.counter,
+            expires_at,
+        )
+        assert session.session_keys is not None
+        ciphertext_with_tag = aes_gcm_encrypt(
+            key=session.session_keys.encryption_key,
+            nonce=nonce,
+            data=payload_bytes,
+            aad=aad,
+        )
+
+        # AES-GCM in cryptography returns ciphertext + 16-byte tag
+        ciphertext = ciphertext_with_tag[:-16]
+        tag = ciphertext_with_tag[-16:]
+
+        msg.protobuf_message_as_bytes = ciphertext
+        personalized.tag = tag
+
+        return msg
+
+    def _prepare_aad(
+        self,
+        domain: int,
+        counter: int,
+        epoch: bytes | None,
+        sig_type: int,
+        expires_at: int,
+    ) -> bytes:
+        """Prepare Associated Authenticated Data for encryption/decryption.
+
+        AAD uses a TLV (Tag-Length-Value) format for metadata hashing.
+        """
+        _LOGGER.debug(
+            "Preparing AAD: domain=%s, counter=%d, vin=%s, sig_type=%d, expires_at=%d",
+            domain,
+            counter,
+            self._vin,
+            sig_type,
+            expires_at,
+        )
+        aad = bytearray()
+
+        # TagSignatureType (0x00) + Length (0x01) + Value (1 byte)
+        aad.append(signatures_pb2.TAG_SIGNATURE_TYPE)
+        aad.append(1)
+        aad.append(sig_type)
+
+        # TagDomain (0x01) + Length (0x01) + Value (1 byte)
+        # Note: Reference uses 1 byte for domain in AAD
+        aad.append(signatures_pb2.TAG_DOMAIN)
+        aad.append(1)
+        aad.append(domain)
+
+        # TagPersonalization (0x02) + Length + Value (VIN)
+        if self._vin:
+            vin_bytes = self._vin.encode("utf-8")
+            aad.append(signatures_pb2.TAG_PERSONALIZATION)
+            aad.append(len(vin_bytes))
+            aad.extend(vin_bytes)
+
+        # TagEpoch (0x03) + Length (0x10) + Value (16 bytes)
+        aad.append(signatures_pb2.TAG_EPOCH)
+        aad.append(16)
+        if epoch is not None:
+            aad.extend(epoch)
+        else:
+            aad.extend(b"\x00" * 16)
+
+        # TagExpiresAt (0x04) + Length (0x04) + Value (4 bytes BE)
+        aad.append(signatures_pb2.TAG_EXPIRES_AT)
+        aad.append(4)
+        aad.extend(expires_at.to_bytes(4, "big"))
+
+        # TagCounter (0x05) + Length (0x04) + Value (4 bytes BE)
+        aad.append(signatures_pb2.TAG_COUNTER)
+        aad.append(4)
+        aad.extend(counter.to_bytes(4, "big"))
+
+        # TagEnd (0xFF)
+        aad.append(signatures_pb2.TAG_END)
+
+        return bytes(aad)
+
+    def unwrap_message(
+        self, domain: int, msg: Any
+    ) -> bytes:
+        """Decrypt and verify an incoming RoutableMessage.
+
+        Args:
+            domain: The domain the message came from.
+            msg: The received RoutableMessage.
+
+        Returns:
+            The decrypted payload bytes.
+        """
+        session = self.get_session(domain)
+
+        # Check for message status errors
+        if msg.HasField("signedMessageStatus"):
+            status = msg.signedMessageStatus
+            if status.operation_status == universal_message_pb2.OPERATIONSTATUS_ERROR:
+                _LOGGER.error("Received error status: %s", status.signed_message_fault)
+                if status.signed_message_fault in (
+                    universal_message_pb2.MESSAGEFAULT_ERROR_INVALID_TOKEN_OR_COUNTER,
+                    universal_message_pb2.MESSAGEFAULT_ERROR_INCORRECT_EPOCH,
+                ):
+                    self.invalidate_session(domain)
+                return msg.protobuf_message_as_bytes # type: ignore
+
+        if not session.is_authenticated():
+            # If not authenticated, return raw bytes (e.g. for status messages)
+            return msg.protobuf_message_as_bytes # type: ignore
+
+        if msg.signature_data.WhichOneof("sig_type") != "AES_GCM_Response_data":
+            _LOGGER.debug(
+                "Message from %s does not have AES_GCM_Response_data signature", domain
+            )
+            return msg.protobuf_message_as_bytes # type: ignore
+
+        resp_data = msg.signature_data.AES_GCM_Response_data
+
+        # Verify counter (anti-replay) - responses should ideally have higher counters
+        # But for now, we just log it as the vehicle manages its own counter state
+        _LOGGER.debug(
+            "Received response counter: %d (local: %d)",
+            resp_data.counter,
+            session.counter,
+        )
+
+        ciphertext = msg.protobuf_message_as_bytes
+        tag = resp_data.tag
+        nonce = resp_data.nonce
+
+        # Decrypt
+        try:
+            # Responses use an empty AAD or specific AAD depending on version.
+            # Most common is empty AAD for responses.
+            _LOGGER.debug(
+                "Unwrapping response for domain %s, counter %d",
+                domain,
+                resp_data.counter,
+            )
+            assert session.session_keys is not None
+            plaintext = aes_gcm_decrypt(
+                key=session.session_keys.encryption_key,
+                nonce=nonce,
+                data=ciphertext + tag,
+                aad=b"",
+            )
+            return plaintext
+        except Exception as e:
+            _LOGGER.error("Failed to decrypt message from %s: %s", domain, e)
+            raise
+
+    def prepare_pairing_message(
+        self, role: int = keys_pb2.ROLE_DRIVER
+    ) -> Any:
+        """Prepare a whitelist message for pairing.
+
+        Args:
+            role: The role to request (default: ROLE_DRIVER).
+
+        Returns:
+            The prepared ToVCSECMessage containing the VCSEC whitelist operation.
+        """
+        # 1. Create PermissionChange (to specify role)
+        perm_change = vcsec_pb2.PermissionChange()
+        perm_change.key.PublicKeyRaw = self._public_key_bytes
+        perm_change.keyRole = role  # type: ignore
+
+        # 2. Create WhitelistOperation
+        wl_op = vcsec_pb2.WhitelistOperation()
+        wl_op.addKeyToWhitelistAndAddPermissions.CopyFrom(perm_change)
+        wl_op.metadataForKey.keyFormFactor = vcsec_pb2.KEY_FORM_FACTOR_CLOUD_KEY
+
+        # 3. Wrap in UnsignedMessage
+        unsigned_msg = vcsec_pb2.UnsignedMessage()
+        unsigned_msg.WhitelistOperation.CopyFrom(wl_op)
+
+        # 4. Wrap in ToVCSECMessage with PRESENT_KEY signature
+        # This is the standard pairing message that vehicles expect when
+        # whitelisting a new key.
+        to_vcsec = vcsec_pb2.ToVCSECMessage()
+        to_vcsec.signedMessage.protobufMessageAsBytes = unsigned_msg.SerializeToString()
+        to_vcsec.signedMessage.signatureType = vcsec_pb2.SIGNATURE_TYPE_PRESENT_KEY
+
+        return to_vcsec

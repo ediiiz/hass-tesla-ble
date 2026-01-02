@@ -1,0 +1,7 @@
+{
+  "name": "Tesla BLE",
+  "content_in_root": false,
+  "homeassistant": "2025.12.5",
+  "render_readme": true,
+  "country": []
+}
