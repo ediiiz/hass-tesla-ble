@@ -248,7 +248,9 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_already_configured()
             return await self.async_step_vin()
 
-        discovered: Iterable[BluetoothServiceInfoBleak] = async_discovered_service_info(self.hass)
+        discovered: Iterable[BluetoothServiceInfoBleak] = async_discovered_service_info(
+            self.hass
+        )
         self._discovered_devices: dict[str, str] = {}
 
         for info in discovered:

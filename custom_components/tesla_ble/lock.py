@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONF_VIN, DOMAIN
 from .coordinator import TeslaBLEDataUpdateCoordinator
-from .entity import TeslaBLEEntity
+from .entity import TeslaVehicleEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ async def async_setup_entry(
     async_add_entities([TeslaBLELock(coordinator, vin)])
 
 
-class TeslaBLELock(TeslaBLEEntity, LockEntity):
+class TeslaBLELock(TeslaVehicleEntity, LockEntity):
     """Tesla BLE vehicle lock."""
 
     _attr_name = "Lock"

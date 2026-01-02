@@ -49,7 +49,7 @@
 
 ### Implementation
 
-- [ ] T017 [P] [US1] Create `TeslaVehicleEntity` base class in `entity.py`
-- [ ] T018 [US1] Implement `Lock` entity in `lock.py`
-- [ ] T019 [US4] Implement Connection/RSSI diagnostic sensors in `sensor.py`
-- [ ] T020 [US2] update `manifest.json` with dependencies and requirements
+- [x] T017 [P] [US1] Create `TeslaVehicleEntity` base class in `entity.py`
+- [x] T018 [US1] Implement `Lock` entity in `lock.py`
+- [x] T019 [US4] Implement Connection/RSSI diagnostic sensors in `sensor.py`
+- [x] T020 [US2] update `manifest.json` with dependencies and requirements

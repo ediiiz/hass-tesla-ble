@@ -6,8 +6,10 @@ import logging
 from datetime import timedelta
 from typing import Any
 
+from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .ble_client import TeslaHABLEClient
 from .core.proto import universal_message_pb2, vcsec_pb2
@@ -39,6 +41,10 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.protocol = TeslaProtocol(session_manager)
         self.address = address
         self.data = {
+            "connected": False,
+            "rssi": None,
+            "last_seen": None,
+            "connection_source": None,
             "locked": None,
             "charge_state": {},
             "climate_state": {},
@@ -51,12 +57,44 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from the vehicle."""
+        # Update diagnostics from HA's Bluetooth cache.
+        # This may be available even if not connected.
+        device = bluetooth.async_ble_device_from_address(self.hass, self.address)
+        rssi = getattr(device, "rssi", None) if device else None
+        self.data["rssi"] = rssi
+
+        # Best-effort: discover "connection source" from last service info.
+        # (e.g. proxy vs local)
+        service_info: Any | None = None
+        async_last_service_info = getattr(bluetooth, "async_last_service_info", None)
+        if callable(async_last_service_info):
+            try:
+                service_info = async_last_service_info(
+                    self.hass, self.address, connectable=True
+                )
+            except TypeError:
+                service_info = async_last_service_info(self.hass, self.address)
+
+        self.data["connection_source"] = (
+            getattr(service_info, "source", None) if service_info else None
+        )
+
+        # Update last_seen only when we have signal info.
+        # Otherwise clear it if we can't find the device at all.
+        if device is None:
+            self.data["last_seen"] = None
+        elif rssi is not None:
+            self.data["last_seen"] = dt_util.utcnow()
+
         if not self.client.is_connected:
             _LOGGER.debug("Connecting to Tesla vehicle at %s", self.address)
             if not await self.client.connect(self.address):
+                self.data["connected"] = False
                 raise UpdateFailed(
                     f"Failed to connect to Tesla vehicle at {self.address}"
                 )
+
+        self.data["connected"] = self.client.is_connected
 
         # Always ensure notifications are registered for this coordinator instance.
         # This handles both fresh connections and existing connections passed from

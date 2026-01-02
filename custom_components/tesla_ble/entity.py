@@ -1,4 +1,4 @@
-"""Base entity for Tesla BLE integration."""
+"""Base entity classes for Tesla BLE integration."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from .const import DOMAIN
 from .coordinator import TeslaBLEDataUpdateCoordinator
 
 
-class TeslaBLEEntity(CoordinatorEntity[TeslaBLEDataUpdateCoordinator]):
-    """Base class for Tesla BLE entities."""
+class TeslaVehicleEntity(CoordinatorEntity[TeslaBLEDataUpdateCoordinator]):
+    """Base class for Tesla vehicle entities backed by the BLE coordinator."""
 
     _attr_has_entity_name = True
 
@@ -21,13 +21,18 @@ class TeslaBLEEntity(CoordinatorEntity[TeslaBLEDataUpdateCoordinator]):
     ) -> None:
         """Initialize the entity."""
         super().__init__(coordinator)
-        self.vin = vin
+        self._vin = vin
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, vin)},
             manufacturer="Tesla",
-            model="Vehicle",  # We could refine this if we had more info
+            model="Vehicle",  # TODO: refine if/when we have model details
             name=f"Tesla {vin[-5:]}",
         )
+
+    @property
+    def vin(self) -> str:
+        """Vehicle VIN."""
+        return self._vin
 
     @property
     def unique_id(self) -> str:
@@ -35,3 +40,7 @@ class TeslaBLEEntity(CoordinatorEntity[TeslaBLEDataUpdateCoordinator]):
         if self.entity_description:
             return f"{self.vin}_{self.entity_description.key}"
         return f"{self.vin}_{self.__class__.__name__.lower()}"
+
+
+# Backwards-compatible alias (older code used TeslaBLEEntity).
+TeslaBLEEntity = TeslaVehicleEntity
