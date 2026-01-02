@@ -58,12 +58,13 @@ class TeslaBLEDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     f"Failed to connect to Tesla vehicle at {self.address}"
                 )
 
-        # Always ensure notifications are registered for this coordinator instance
-        # This handles both fresh connections and existing connections passed from config flow
+        # Always ensure notifications are registered for this coordinator instance.
+        # This handles both fresh connections and existing connections passed from
+        # config flow.
         try:
             await self.client.register_notification_callback(self._handle_notification)
         except Exception as e:
-            _LOGGER.debug("Failed to register notification callback (might be already registered): %s", e)
+            _LOGGER.debug("Notification callback not registered: %s", e)
 
         # Ensure we have authenticated sessions
         for domain in [

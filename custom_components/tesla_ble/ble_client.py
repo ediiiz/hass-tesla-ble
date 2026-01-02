@@ -43,7 +43,7 @@ class TeslaHABLEClient(TeslaBLEInterface):
         """Check if currently connected to the vehicle."""
         return self._client is not None and self._client.is_connected
 
-    async def connect(self, address: str) -> bool:
+    async def connect(self, address: str | None = None) -> bool:
         """Connect to the vehicle using HA's Bluetooth infrastructure.
 
         Args:
@@ -52,6 +52,10 @@ class TeslaHABLEClient(TeslaBLEInterface):
         Returns:
             True if connection was successful, False otherwise.
         """
+        if address is None:
+            _LOGGER.error("Cannot connect: address is required")
+            return False
+
         self._address = address
         _LOGGER.debug("Attempting to connect to Tesla vehicle at %s", address)
 
@@ -118,31 +122,38 @@ class TeslaHABLEClient(TeslaBLEInterface):
             #
             # NOTE: BLE MTU is usually negotiated. Bleak handles this if response=True.
             # For response=False, we must be careful.
-            
+
             # Use a conservative chunk size.
             CHUNK_SIZE = 20
             total_chunks = (len(data) + CHUNK_SIZE - 1) // CHUNK_SIZE
-            
+
             _LOGGER.info(
                 "Writing %d bytes to %s in %d chunks",
                 len(data),
                 TESLA_WRITE_CHAR_UUID,
-                total_chunks
+                total_chunks,
             )
 
             for i in range(0, len(data), CHUNK_SIZE):
                 chunk = data[i : i + CHUNK_SIZE]
                 chunk_num = i // CHUNK_SIZE + 1
-                _LOGGER.info("Writing chunk %d/%d: %s", chunk_num, total_chunks, chunk.hex())
-                
+                _LOGGER.info(
+                    "Writing chunk %d/%d: %s",
+                    chunk_num,
+                    total_chunks,
+                    chunk.hex(),
+                )
+
                 await self._client.write_gatt_char(
-                    TESLA_WRITE_CHAR_UUID, chunk, response=False
+                    TESLA_WRITE_CHAR_UUID,
+                    chunk,
+                    response=False,
                 )
                 # Small sleep to avoid overwhelming the controller's TX queue
                 await asyncio.sleep(0.05)
-            
+
             _LOGGER.info("Finished writing all chunks")
-                
+
         except BleakError as err:
             _LOGGER.error("Error writing to Tesla vehicle characteristic: %s", err)
             # We don't disconnect here, but the connection might be dead

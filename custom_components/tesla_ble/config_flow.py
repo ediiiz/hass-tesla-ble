@@ -54,12 +54,7 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Try to extract VIN from the name if we cached it, or just use the
             # device name
             name = self._discovered_devices.get(self._address)
-            if (
-                name
-                and name.startswith("S")
-                and name.endswith("C")
-                and len(name) == 18
-            ):
+            if name and name.startswith("S") and name.endswith("C") and len(name) == 18:
                 # Name is effectively the partial VIN hash, but we don't have
                 # the full VIN yet
                 # We will update the config entry title later once we have the full VIN
@@ -98,7 +93,7 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 and info.name.endswith("C")
                 and len(info.name) == 18
             ):
-                 # Check if the middle part is hex
+                # Check if the middle part is hex
                 try:
                     int(info.name[1:-1], 16)
                     is_tesla = True
@@ -113,7 +108,7 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "Device %s skipped: Not identified as Tesla (UUID: %s, Name: %s)",
                     info.address,
                     info.service_uuids,
-                    info.name
+                    info.name,
                 )
 
         if not self._discovered_devices:
@@ -204,7 +199,7 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Generate pairing message
             _LOGGER.info("Preparing pairing message for address: %s", self._address)
             _LOGGER.info("Current VIN in flow: %s", self._vin)
-            
+
             # Inspect Public Key
             public_key = self._session_manager.public_key_bytes.hex()
             _LOGGER.info("Public Key: %s", public_key)
@@ -222,13 +217,13 @@ class TeslaBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "Pairing message prepared (proto_len=%d, total_len=%d): %s",
                 len(data),
                 length + 2,
-                encoded_msg.hex()
+                encoded_msg.hex(),
             )
 
             # Define a callback to log incoming notifications
             def _notification_callback(data: bytes) -> None:
                 _LOGGER.info("Received notification during pairing: %s", data.hex())
-            
+
             # Subscribe to notifications BEFORE writing
             _LOGGER.info("Subscribing to notifications...")
             await self._client.register_notification_callback(_notification_callback)
