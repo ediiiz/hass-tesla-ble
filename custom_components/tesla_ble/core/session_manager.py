@@ -135,9 +135,7 @@ class TeslaSessionManager:
         session.epoch = None
         session.counter = 0
 
-    def prepare_session_info_request(
-        self, domain: int
-    ) -> Any:
+    def prepare_session_info_request(self, domain: int) -> Any:
         """Prepare a SessionInfoRequest message.
 
         Args:
@@ -159,9 +157,7 @@ class TeslaSessionManager:
 
         return msg
 
-    def update_session(
-        self, domain: int, session_info: Any
-    ) -> None:
+    def update_session(self, domain: int, session_info: Any) -> None:
         """Update session state from a SessionInfo message.
 
         Args:
@@ -367,9 +363,7 @@ class TeslaSessionManager:
 
         return bytes(aad)
 
-    def unwrap_message(
-        self, domain: int, msg: Any
-    ) -> bytes:
+    def unwrap_message(self, domain: int, msg: Any) -> bytes:
         """Decrypt and verify an incoming RoutableMessage.
 
         Args:
@@ -391,17 +385,17 @@ class TeslaSessionManager:
                     universal_message_pb2.MESSAGEFAULT_ERROR_INCORRECT_EPOCH,
                 ):
                     self.invalidate_session(domain)
-                return msg.protobuf_message_as_bytes # type: ignore
+                return msg.protobuf_message_as_bytes  # type: ignore
 
         if not session.is_authenticated():
             # If not authenticated, return raw bytes (e.g. for status messages)
-            return msg.protobuf_message_as_bytes # type: ignore
+            return msg.protobuf_message_as_bytes  # type: ignore
 
         if msg.signature_data.WhichOneof("sig_type") != "AES_GCM_Response_data":
             _LOGGER.debug(
                 "Message from %s does not have AES_GCM_Response_data signature", domain
             )
-            return msg.protobuf_message_as_bytes # type: ignore
+            return msg.protobuf_message_as_bytes  # type: ignore
 
         resp_data = msg.signature_data.AES_GCM_Response_data
 
@@ -438,9 +432,7 @@ class TeslaSessionManager:
             _LOGGER.error("Failed to decrypt message from %s: %s", domain, e)
             raise
 
-    def prepare_pairing_message(
-        self, role: int = keys_pb2.ROLE_DRIVER
-    ) -> Any:
+    def prepare_pairing_message(self, role: int = keys_pb2.ROLE_DRIVER) -> Any:
         """Prepare a whitelist message for pairing.
 
         Args:

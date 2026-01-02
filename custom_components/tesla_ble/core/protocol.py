@@ -129,9 +129,7 @@ class TeslaProtocol:
             setattr(unsigned_msg.closureMoveRequest, field, value)
         return self._wrap_vcsec_unsigned_message(unsigned_msg)
 
-    def _wrap_vcsec_unsigned_message(
-        self, unsigned_msg: Any
-    ) -> bytes:
+    def _wrap_vcsec_unsigned_message(self, unsigned_msg: Any) -> bytes:
         """Wrap a VCSEC message into a secure RoutableMessage and prepend length."""
         # Wrap UnsignedMessage into ToVCSECMessage
         to_vcsec = vcsec_pb2.ToVCSECMessage()
