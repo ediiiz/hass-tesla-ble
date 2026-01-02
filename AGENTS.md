@@ -20,7 +20,7 @@ We are building a Home Assistant Custom Component (Integration) named `hass-tesl
 
 ## Development Directives
 1.  **Context-Driven Development:** Every file and function must have clear, typed interfaces. We build from the core data models *outwards* to the HA interface.
-2.  **Reference Implementation:** The `yoziru-esphome-tesla-ble` (C++) project is our "gold standard" for logic. We are porting this logic to Python.
+2.  **Reference Implementation:** The `esphome-tesla-ble` (C++) project is our "gold standard" for logic. We are porting this logic to Python.
     - *Mapping:*
       - `SessionManager` (C++) -> `TeslaSessionManager` (Python)
       - `BLEManager` (C++) -> `TeslaBLEClient` (Python using HA Bluetooth)
