@@ -28,7 +28,8 @@
       "unknown": "An unexpected error occurred."
     },
     "abort": {
-      "already_configured": "This vehicle is already configured."
+      "already_configured": "This vehicle is already configured.",
+      "missing_address": "No vehicle address was provided by discovery."
     }
   }
 }

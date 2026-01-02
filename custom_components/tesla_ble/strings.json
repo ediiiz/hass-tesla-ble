@@ -8,6 +8,13 @@
           "device": "Vehicle"
         }
       },
+      "vin": {
+        "title": "Vehicle Identification Number",
+        "description": "Enter the 17-character VIN of your Tesla vehicle. This is required for secure communication.",
+        "data": {
+          "vin": "VIN"
+        }
+      },
       "pair": {
         "title": "Pairing with Vehicle",
         "description": "A pairing request has been sent to the vehicle. Please confirm the pairing on the vehicle's touchscreen or by tapping your NFC key card on the center console."
@@ -15,12 +22,14 @@
     },
     "error": {
       "cannot_connect": "Failed to connect to the vehicle. Ensure it is in range and Bluetooth is enabled.",
+      "invalid_vin": "Invalid VIN. Please enter a valid 17-character VIN.",
       "pairing_failed": "Pairing failed. The request was timed out or rejected by the vehicle.",
       "no_devices_found": "No Tesla vehicles found nearby.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {
-      "already_configured": "This vehicle is already configured."
+      "already_configured": "This vehicle is already configured.",
+      "missing_address": "No vehicle address was provided by discovery."
     }
   }
 }

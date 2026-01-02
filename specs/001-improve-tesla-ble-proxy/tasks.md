@@ -37,11 +37,11 @@
 
 ### Implementation
 
-- [ ] T012 [P] [US3] Create `ConfigFlow` skeleton in `config_flow.py`
-- [ ] T013 [US3] Implement `async_step_bluetooth` for discovery
-- [ ] T014 [US3] Implement `TeslaPairingWizard` helper to handle ephemeral pairing connection
-- [ ] T015 [US3] Implement `async_step_pair` with "Tap Key Card" prompt and polling
-- [ ] T016 [US3] Save session keys to `ConfigEntry` upon success
+- [x] T012 [P] [US3] Create `ConfigFlow` skeleton in `config_flow.py`
+- [x] T013 [US3] Implement `async_step_bluetooth` for discovery
+- [x] T014 [US3] Implement `TeslaPairingWizard` helper to handle ephemeral pairing connection
+- [x] T015 [US3] Implement `async_step_pair` with "Tap Key Card" prompt and polling
+- [x] T016 [US3] Save session keys to `ConfigEntry` upon success
 
 ## Phase 5: Entities & UI (Priority: P1)
 
